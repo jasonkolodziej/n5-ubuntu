@@ -1,2 +1,4 @@
 **/*.asc
 **/*.env
+**-gnupg*
+**/snapcraft*-credentials**

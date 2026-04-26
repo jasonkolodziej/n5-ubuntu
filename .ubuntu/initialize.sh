@@ -5,12 +5,16 @@ set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 export TZ="${TZ:-UTC}"
 export PATH="/snap/bin:$PATH"
-# Use null keyring so snapcraft local operations (create-key, keys) work headlessly.
-# Only store-touching commands (register-key, whoami) need real credentials.
+export GPG_TTY="$(tty 2>/dev/null || true)"
+# Use null keyring in containers; rely on SNAPCRAFT_STORE_CREDENTIALS for store auth.
 export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
 EMAIL="${EMAIL:-your-email@example.com}"
 KEY_NAME="${KEY_NAME:-n5pro-key}"
+OUTPUT_DIR="${OUTPUT_DIR:-/data}"
+REQUIRE_SNAPCRAFT_AUTH="${REQUIRE_SNAPCRAFT_AUTH:-1}"
 SNAPCRAFT_AUTH_READY=0
+DEVELOPER_ID=""
+MODE="${1:-full}"
 
 start_snapd() {
   if [ "$(ps -p 1 -o comm= 2>/dev/null || true)" != "systemd" ]; then
@@ -72,54 +76,94 @@ configure_snapcraft_auth() {
   echo "warning: no Snap Store credentials configured; store-auth commands may fail" >&2
 }
 
+collect_developer_id() {
+  local whoami_out
+  whoami_out="$(snapcraft whoami 2>/dev/null || true)"
+  DEVELOPER_ID="$(printf '%s\n' "$whoami_out" | awk '/^id:/ {print $2; exit}')"
+
+  if [ -n "$DEVELOPER_ID" ]; then
+    echo "snapcraft developer id: $DEVELOPER_ID"
+    return
+  fi
+
+  if [ "$REQUIRE_SNAPCRAFT_AUTH" = "1" ]; then
+    echo "error: unable to read developer id from 'snapcraft whoami'" >&2
+    echo "hint: set SNAPCRAFT_STORE_CREDENTIALS in .env or /data/snapcraft-store-credentials.txt and rerun" >&2
+    exit 1
+  fi
+
+  echo "warning: developer id not available (store auth not configured)" >&2
+}
+
 setup_signing_key() {
-  if [ "$SNAPCRAFT_AUTH_READY" -eq 1 ]; then
-    # Full snapcraft flow: create (talks to store) + register
-    if snapcraft keys 2>/dev/null | awk 'NR>1 {print $1}' | grep -qx "$KEY_NAME"; then
-      echo "snapcraft key '$KEY_NAME' already exists"
-    else
-      snapcraft create-key "$KEY_NAME"
-    fi
-    snapcraft keys
-    snapcraft register-key "$KEY_NAME"
+  if snap keys 2>/dev/null | awk 'NR>1 {print $1}' | grep -qx "$KEY_NAME"; then
+    echo "snap key '$KEY_NAME' already exists"
   else
-    # No store credentials: create a raw GPG key that snap sign can use later
-    if gpg --list-secret-keys "$KEY_NAME" >/dev/null 2>&1; then
-      echo "GPG key '$KEY_NAME' already exists locally"
-    else
-      echo "creating local GPG key '$KEY_NAME' (no store credentials; skipping snapcraft create-key)" >&2
-      gpg --batch --gen-key <<EOF
-%no-protection
-Key-Type: RSA
-Key-Length: 4096
-Name-Real: $KEY_NAME
-Name-Email: $EMAIL
-Expire-Date: 0
-%commit
-EOF
+    echo "creating snap signing key '$KEY_NAME'"
+    snap create-key "$KEY_NAME"
+  fi
+
+  if [ "$SNAPCRAFT_AUTH_READY" -eq 1 ]; then
+    if ! snapcraft register-key "$KEY_NAME"; then
+      echo "warning: could not register key '$KEY_NAME' (it may already be registered)" >&2
     fi
-    echo "note: key created locally but not registered with Snap Store" >&2
-    echo "      to register later: snapcraft login && snapcraft register-key \"$KEY_NAME\"" >&2
+  elif [ "$REQUIRE_SNAPCRAFT_AUTH" = "1" ]; then
+    echo "error: store auth required but missing; cannot register key '$KEY_NAME'" >&2
+    exit 1
+  else
+    echo "warning: key created locally but not registered with Snap Store" >&2
   fi
 }
 
 export_secret_key() {
-  local out="/data/${KEY_NAME}.asc"
+  local out="$OUTPUT_DIR/${KEY_NAME}.asc"
+  local snap_gnupg_home="/root/.snap/gnupg"
+
+  mkdir -p "$OUTPUT_DIR"
 
   local key_arg
-  if gpg --list-secret-keys "$EMAIL" >/dev/null 2>&1; then
-    key_arg="$EMAIL"
-  else
-    key_arg="$(gpg --list-secret-keys --with-colons | awk -F: '/^fpr:/ {print $10; exit}')"
-  fi
+  key_arg="$(gpg --homedir "$snap_gnupg_home" --list-secret-keys --with-colons | awk -F: '/^fpr:/ {print $10; exit}')"
 
   if [ -z "${key_arg:-}" ]; then
-    echo "warning: no secret GPG key found to export" >&2
+    echo "warning: no secret key found in $snap_gnupg_home to export" >&2
     return
   fi
 
-  gpg --armor --export-secret-keys "$key_arg" > "$out"
-  echo "private key exported to $out (host path: .ubuntu/data/${KEY_NAME}.asc)"
+  if ! gpg --homedir "$snap_gnupg_home" --armor --export-secret-keys "$key_arg" > "$out"; then
+    echo "error: failed exporting secret key (passphrase may be required)" >&2
+    echo "hint: run inside container: gpg --homedir $snap_gnupg_home --armor --export-secret-keys $key_arg > $out" >&2
+    exit 1
+  fi
+
+  echo "private key exported to $out"
+}
+
+export_snap_gnupg_bundle() {
+  local tar_out="$OUTPUT_DIR/snap-gnupg.tar"
+  local b64_out="$OUTPUT_DIR/snap-gnupg.tar.b64"
+
+  if [ -d /root/.snap/gnupg ]; then
+    tar -C /root -cf "$tar_out" .snap/gnupg
+    base64 -w0 "$tar_out" > "$b64_out"
+    echo "snap gnupg tarball exported to $tar_out"
+    echo "snap gnupg base64 exported to $b64_out"
+  else
+    echo "warning: /root/.snap/gnupg not found; skipping SNAP_GNUPG_TAR_B64 export" >&2
+  fi
+}
+
+write_secret_summary() {
+  local env_out="$OUTPUT_DIR/github-secrets.env"
+
+  {
+    echo "# GitHub Actions secrets generated by initialize.sh"
+    echo "DEVELOPER_ID=$DEVELOPER_ID"
+    echo "SIGNING_KEY_NAME=$KEY_NAME"
+    echo "# Set SIGNING_KEY from file: $OUTPUT_DIR/${KEY_NAME}.asc"
+    echo "# Set SNAP_GNUPG_TAR_B64 from file: $OUTPUT_DIR/snap-gnupg.tar.b64"
+  } > "$env_out"
+
+  echo "secret summary written to $env_out"
 }
 
 ln -snf "/usr/share/zoneinfo/$TZ" /etc/localtime
@@ -128,13 +172,17 @@ echo "$TZ" > /etc/timezone
 install_required_tools
 start_snapd
 ensure_snapcraft_cli
-configure_snapcraft_auth
 
-# snapcraft whoami prints authority/brand IDs used in model assertion workflows.
-# The snapcraft whoami output will show your id: — that's your authority-id and brand-id for the model assertion.
-if ! snapcraft whoami; then
-  echo "warning: snapcraft whoami failed (likely no keyring/store login in this container)" >&2
+if [ "$MODE" = "prepare" ]; then
+  echo "prepare mode complete: snapd/snapcraft installed and ready"
+  echo "next: run 'snapcraft login' and 'snapcraft export-login /data/snapcraft-store-credentials.txt'"
+  exit 0
 fi
+
+configure_snapcraft_auth
+collect_developer_id
 setup_signing_key
 export_secret_key
+export_snap_gnupg_bundle
+write_secret_summary
 

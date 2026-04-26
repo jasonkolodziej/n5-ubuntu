@@ -39,14 +39,39 @@ jobs:
       - name: Import signing key
         env:
           SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          SNAP_GNUPG_TAR_B64: ${{ secrets.SNAP_GNUPG_TAR_B64 }}
+          SIGNING_KEY_NAME: ${{ secrets.SIGNING_KEY_NAME }}
         run: |
           mkdir -p "$SNAP_GNUPG_HOME"
           chmod 700 "$SNAP_GNUPG_HOME"
-          echo "$SIGNING_KEY" | gpg --homedir "$SNAP_GNUPG_HOME" --batch --yes --import
-          # Mark key as ultimately trusted without interactive TTY prompts.
-          fingerprint=$(gpg --homedir "$SNAP_GNUPG_HOME" --list-secret-keys --with-colons | awk -F: '/^fpr:/ {print $10; exit}')
-          echo "$fingerprint:6:" | gpg --homedir "$SNAP_GNUPG_HOME" --batch --import-ownertrust
-          gpg --homedir "$SNAP_GNUPG_HOME" --list-secret-keys --keyid-format LONG
+
+          if [ -n "${SNAP_GNUPG_TAR_B64:-}" ]; then
+            echo "$SNAP_GNUPG_TAR_B64" | base64 -d > /tmp/snap-gnupg.tar
+            tar -xf /tmp/snap-gnupg.tar -C /home/runner
+            chmod 700 "$SNAP_GNUPG_HOME"
+          elif [ -n "${SIGNING_KEY:-}" ]; then
+            # Backward-compatible path: import ASCII-armored key material.
+            # Note: this may not create snap-managed key names in `snap keys`.
+            echo "$SIGNING_KEY" | gpg --homedir "$SNAP_GNUPG_HOME" --batch --yes --import
+            fingerprint=$(gpg --homedir "$SNAP_GNUPG_HOME" --list-secret-keys --with-colons | awk -F: '/^fpr:/ {print $10; exit}')
+            if [ -n "$fingerprint" ]; then
+              echo "$fingerprint:6:" | gpg --homedir "$SNAP_GNUPG_HOME" --batch --import-ownertrust
+            fi
+          else
+            echo "error: set either SIGNING_KEY or SNAP_GNUPG_TAR_B64 secret" >&2
+            exit 1
+          fi
+
+          echo "=== snap keys ==="
+          snap keys || true
+
+          resolved_key_name="${SIGNING_KEY_NAME:-$(snap keys | awk 'NR>1 {print $1; exit}')}"
+          if [ -z "$resolved_key_name" ]; then
+            echo "error: no snap key name available for signing." >&2
+            echo "hint: provide SNAP_GNUPG_TAR_B64 (tar of ~/.snap/gnupg) and SIGNING_KEY_NAME secret." >&2
+            exit 1
+          fi
+          echo "SIGNING_KEY_NAME_RESOLVED=$resolved_key_name" >> "$GITHUB_ENV"
 
       - name: Sign model assertion
         env:
@@ -60,9 +85,7 @@ jobs:
           sed -i "s|__GRADE__|$GRADE|g" n5pro-model.json
           
           # Sign it
-          key_id=$(gpg --homedir "$SNAP_GNUPG_HOME" --list-secret-keys --keyid-format LONG --with-colons | awk -F: '/^sec:/ {print $5; exit}')
-          gpg --homedir "$SNAP_GNUPG_HOME" --list-secret-keys "$key_id" >/dev/null
-          cat n5pro-model.json | SNAP_GNUPG_HOME="$SNAP_GNUPG_HOME" snap sign -k "$key_id" > n5pro.model
+          cat n5pro-model.json | SNAP_GNUPG_HOME="$SNAP_GNUPG_HOME" snap sign -k "$SIGNING_KEY_NAME_RESOLVED" > n5pro.model
           
           echo "=== Signed Model Assertion ==="
           cat n5pro.model

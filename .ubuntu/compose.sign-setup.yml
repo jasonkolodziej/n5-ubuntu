@@ -25,12 +25,14 @@ services:
     image: n5/ubuntu-sign-setup:24.04
     container_name: ubuntu-snap
     command: /sbin/init
-    restart: unless-stopped
+    restart: "no"
     environment:
       - TZ=${TZ:-UTC}
       - DOCKER_HOST=unix:///var/run/docker.sock
       - EMAIL=${EMAIL:-your-email@example.com}
       - KEY_NAME=${KEY_NAME:-n5pro-key}
+      - OUTPUT_DIR=${OUTPUT_DIR:-/data}
+      - REQUIRE_SNAPCRAFT_AUTH=${REQUIRE_SNAPCRAFT_AUTH:-1}
       - SNAPCRAFT_STORE_CREDENTIALS=${SNAPCRAFT_STORE_CREDENTIALS:-}
       - PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
     tmpfs:
