@@ -60,6 +60,8 @@ Notes:
 
 - During `/bin/bash /initialize.sh`, `snap create-key` may prompt for a passphrase.
 - If a passphrase-protected key is used, GPG may prompt again while exporting `SIGNING_KEY`.
+- The image workflow is split so the `build` job runs with `permissions: contents: read` and a separate `release` job on `main` downloads the artifact and creates the GitHub release with `permissions: contents: write`.
+- If repository or organization Actions settings force `GITHUB_TOKEN` to read-only, the `release` job will still fail with `Resource not accessible by integration`; set Actions `Workflow permissions` to `Read and write permissions`.
 
 ## Day 2+ (Rerun / Rotate Key)
 

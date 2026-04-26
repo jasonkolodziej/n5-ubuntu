@@ -144,8 +144,20 @@ jobs:
           path: build/*.img*
           retention-days: 7
 
+  release:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ubuntu-core-24-n5pro-${{ github.run_number }}
+          path: build
+
       - name: Create release with image
-        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ github.run_number }}
