@@ -41,6 +41,7 @@ jobs:
           SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
           SNAP_GNUPG_TAR_B64: ${{ secrets.SNAP_GNUPG_TAR_B64 }}
           SIGNING_KEY_NAME: ${{ secrets.SIGNING_KEY_NAME }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           mkdir -p "$SNAP_GNUPG_HOME"
           chmod 700 "$SNAP_GNUPG_HOME"
@@ -60,6 +61,28 @@ jobs:
           else
             echo "error: set either SIGNING_KEY or SNAP_GNUPG_TAR_B64 secret" >&2
             exit 1
+          fi
+
+          # Normalize agent config for Linux runners (remove host-specific pinentry path)
+          touch "$SNAP_GNUPG_HOME/gpg-agent.conf"
+          sed -i '/^pinentry-program /d' "$SNAP_GNUPG_HOME/gpg-agent.conf"
+          grep -qx 'allow-loopback-pinentry' "$SNAP_GNUPG_HOME/gpg-agent.conf" || echo 'allow-loopback-pinentry' >> "$SNAP_GNUPG_HOME/gpg-agent.conf"
+          grep -qx 'allow-preset-passphrase' "$SNAP_GNUPG_HOME/gpg-agent.conf" || echo 'allow-preset-passphrase' >> "$SNAP_GNUPG_HOME/gpg-agent.conf"
+          gpgconf --homedir "$SNAP_GNUPG_HOME" --kill gpg-agent || true
+          gpgconf --homedir "$SNAP_GNUPG_HOME" --launch gpg-agent
+
+          # If key is passphrase-protected, preload passphrase so snap sign can run non-interactively.
+          keygrip=$(gpg --homedir "$SNAP_GNUPG_HOME" --with-keygrip --list-secret-keys --with-colons | awk -F: '/^grp:/ {print $10; exit}')
+          preset_cmd="$(command -v gpg-preset-passphrase || true)"
+          if [ -z "$preset_cmd" ] && [ -x /usr/lib/gnupg/gpg-preset-passphrase ]; then
+            preset_cmd=/usr/lib/gnupg/gpg-preset-passphrase
+          fi
+          if [ -z "$preset_cmd" ] && [ -x /usr/lib/gnupg2/gpg-preset-passphrase ]; then
+            preset_cmd=/usr/lib/gnupg2/gpg-preset-passphrase
+          fi
+          if [ -n "${GPG_PASSPHRASE:-}" ] && [ -n "$keygrip" ] && [ -n "$preset_cmd" ]; then
+            "$preset_cmd" --preset --passphrase "$GPG_PASSPHRASE" "$keygrip"
+            echo "preloaded key passphrase into gpg-agent"
           fi
 
           echo "=== snap keys ==="
