@@ -24,6 +24,9 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
+    env:
+      GNUPGHOME: /home/runner/.gnupg
+      SNAP_GNUPG_HOME: /home/runner/.gnupg
     
     steps:
       - name: Checkout repo
@@ -37,10 +40,13 @@ jobs:
         env:
           SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
         run: |
+          mkdir -p "$GNUPGHOME"
+          chmod 700 "$GNUPGHOME"
           echo "$SIGNING_KEY" | gpg --batch --yes --import
           # Mark key as ultimately trusted without interactive TTY prompts.
           fingerprint=$(gpg --list-secret-keys --with-colons | awk -F: '/^fpr:/ {print $10; exit}')
           echo "$fingerprint:6:" | gpg --batch --import-ownertrust
+          gpg --list-secret-keys --keyid-format LONG
 
       - name: Sign model assertion
         env:
@@ -55,6 +61,7 @@ jobs:
           
           # Sign it
           fingerprint=$(gpg --list-secret-keys --with-colons | awk -F: '/^fpr:/ {print $10; exit}')
+          gpg --list-secret-keys "$fingerprint" >/dev/null
           cat n5pro-model.json | snap sign -k $fingerprint > n5pro.model
           
           echo "=== Signed Model Assertion ==="
