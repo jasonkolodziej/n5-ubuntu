@@ -1,0 +1,121 @@
+name: Build N5 Pro Ubuntu Core 24 Image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'model-assertion/**'
+      - 'gadget/**'
+      - 'snaps/**'
+      - '.github/workflows/**'
+  workflow_dispatch:
+    inputs:
+      grade:
+        description: 'Image grade (dangerous/signed)'
+        required: true
+        default: 'dangerous'
+        type: choice
+        options:
+          - dangerous
+          - signed
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install ubuntu-image
+        run: |
+          sudo snap install ubuntu-image --classic
+
+      - name: Import signing key
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+        run: |
+          echo "$SIGNING_KEY" | gpg --batch --import
+          # Trust the key ultimately so snap sign works non-interactively
+          fingerprint=$(gpg --list-secret-keys --with-colons | grep fpr | head -1 | cut -d: -f10)
+          echo -e "5\ny\n" | gpg --command-fd 0 --edit-key $fingerprint trust quit
+
+      - name: Sign model assertion
+        env:
+          DEVELOPER_ID: ${{ secrets.DEVELOPER_ID }}
+          GRADE: ${{ github.event.inputs.grade || 'dangerous' }}
+        run: |
+          cd model-assertion
+          # Inject secrets into the model template
+          sed -i "s|__DEVELOPER_ID__|$DEVELOPER_ID|g" n5pro-model.json
+          sed -i "s|__TIMESTAMP__|$(date -Iseconds --utc)|g" n5pro-model.json
+          sed -i "s|__GRADE__|$GRADE|g" n5pro-model.json
+          
+          # Sign it
+          fingerprint=$(gpg --list-secret-keys --with-colons | grep fpr | head -1 | cut -d: -f10)
+          cat n5pro-model.json | snap sign -k $fingerprint > n5pro.model
+          
+          echo "=== Signed Model Assertion ==="
+          cat n5pro.model
+
+      - name: Build Ubuntu Core image
+        run: |
+          cd model-assertion
+          
+          # Build command - add any custom snaps from ../snaps/
+          cmd="ubuntu-image snap n5pro.model --validation=enforce --output-dir ../build"
+          
+          # Add any local snaps if they exist
+          for snap in ../snaps/*.snap; do
+            if [ -f "$snap" ]; then
+              cmd="$cmd --snap $snap"
+            fi
+          done
+          
+          echo "Running: $cmd"
+          eval $cmd
+
+      - name: Compress image artifact
+        run: |
+          cd build
+          ls -lh *.img
+          # Compress for faster download (optional)
+          xz -T0 -v *.img || true
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ubuntu-core-24-n5pro-${{ github.run_number }}
+          path: build/*.img*
+          retention-days: 7
+
+      - name: Create release with image
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: "N5 Pro Ubuntu Core 24 Build #${{ github.run_number }}"
+          body: |
+            Custom Ubuntu Core 24 image for Minisforum N5 Pro
+            
+            **Grade:** ${{ github.event.inputs.grade || 'dangerous' }}
+            **Built:** ${{ github.sha }}
+            
+            ## Pre-installed snaps
+            - pc (gadget)
+            - pc-kernel
+            - core24
+            - snapd
+            - console-conf (for initial setup)
+            
+            ## Usage
+            1. Download the `.img.xz` artifact
+            2. Decompress: `unxz ubuntu-core-24-*.img.xz`
+            3. Write to USB: `sudo dd if=*.img of=/dev/sdX bs=4M status=progress`
+            4. Boot N5 Pro from USB, install to NVMe
+          files: build/*.img*
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,43 @@
+services:
+ #? podman compose -f compose.sign-setup.yml down
+ #? podman compose -f compose.sign-setup.yml build --no-cache
+ #? podman compose -f compose.sign-setup.yml up -d --force-recreate
+ #? podman compose -f compose.sign-setup.yml exec ubuntu-snap /bin/bash
+ #? podman compose -f compose.sign-setup.yml exec ubuntu-snap /bin/bash /initialize.sh
+ #? docker compose -f compose.sign-setup.yml build --no-cache
+ #? docker compose -f compose.sign-setup.yml up -d --force-recreate
+ #? docker compose -f compose.sign-setup.yml exec ubuntu-snap /bin/bash
+ #? docker compose -f compose.sign-setup.yml exec ubuntu-snap /bin/bash /initialize.sh
+ #? default socket: /var/run/docker.sock
+ #? podman example: CONTAINER_HOST_SOCKET=/run/podman/podman.sock podman compose -f compose.sign-setup.yml up -d --force-recreate
+ #? macOS note: do not use $XDG_RUNTIME_DIR here; on this host it is empty and expands to /podman/podman.sock
+
+
+#  podman compose --env-file .env -f compose.sign-setup.yml up -d --force-recreate
+# podman compose --env-file .env -f compose.sign-setup.yml exec ubuntu-snap /bin/bash /initialize.sh
+  ubuntu-snap:
+    stdin_open: true
+    tty: true
+    privileged: true
+    build:
+      context: .
+      dockerfile: Dockerfile.sign-setup
+    image: n5/ubuntu-sign-setup:24.04
+    container_name: ubuntu-snap
+    command: /sbin/init
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ:-UTC}
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - EMAIL=${EMAIL:-your-email@example.com}
+      - KEY_NAME=${KEY_NAME:-n5pro-key}
+      - SNAPCRAFT_STORE_CREDENTIALS=${SNAPCRAFT_STORE_CREDENTIALS:-}
+      - PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
+    tmpfs:
+      - /run
+      - /run/lock
+    volumes:
+      - ${CONTAINER_HOST_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+      - ./initialize.sh:/initialize.sh
+      - ./data:/data
