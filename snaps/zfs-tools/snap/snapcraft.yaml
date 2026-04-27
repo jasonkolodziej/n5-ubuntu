@@ -29,6 +29,12 @@ parts:
     plugin: nil
     stage-packages:
       - zfsutils-linux
+    override-pull: |
+      craftctl default
+      # Remove system files with extended attributes that fail on GitHub Actions runners
+      rm -rf $SNAPCRAFT_PART_INSTALL/etc
+      rm -rf $SNAPCRAFT_PART_INSTALL/usr/share/doc
+      rm -rf $SNAPCRAFT_PART_INSTALL/usr/share/man
     stage:
       - usr/sbin/zpool
       - usr/sbin/zfs
