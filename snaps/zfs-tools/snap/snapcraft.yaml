@@ -16,6 +16,8 @@ website: https://github.com/jasonkolodziej/n5-ubuntu
 base: core24
 confinement: devmode
 grade: devel
+environment:
+  TAR_OPTIONS: '--no-xattrs'
 
 parts:
   scripts:
@@ -29,12 +31,12 @@ parts:
     plugin: nil
     stage-packages:
       - zfsutils-linux
-    override-pull: |
-      craftctl default
+    override-build: |
       # Remove system files with extended attributes that fail on GitHub Actions runners
-      rm -rf $SNAPCRAFT_PART_INSTALL/etc
-      rm -rf $SNAPCRAFT_PART_INSTALL/usr/share/doc
-      rm -rf $SNAPCRAFT_PART_INSTALL/usr/share/man
+      rm -rf "$SNAPCRAFT_PART_INSTALL/etc"
+      rm -rf "$SNAPCRAFT_PART_INSTALL/usr/share/doc"
+      rm -rf "$SNAPCRAFT_PART_INSTALL/usr/share/man"
+      rm -rf "$SNAPCRAFT_PART_INSTALL/usr/share/info"
     stage:
       - usr/sbin/zpool
       - usr/sbin/zfs
