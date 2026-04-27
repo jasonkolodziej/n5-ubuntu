@@ -49,6 +49,20 @@ parts:
       # Clean up system files not needed in snap
       rm -rf "$SNAPCRAFT_PART_INSTALL/etc" || true
       rm -rf "$SNAPCRAFT_PART_INSTALL/usr/share" || true
+    stage:
+      - usr/sbin/zpool
+      - usr/sbin/zfs
+      - usr/lib/x86_64-linux-gnu/libzfs.so*
+      - usr/lib/x86_64-linux-gnu/libzpool.so*
+      - usr/lib/x86_64-linux-gnu/libnvpair.so*
+      - usr/lib/x86_64-linux-gnu/libuutil.so*
+    prime:
+      - usr/sbin/zpool
+      - usr/sbin/zfs
+      - usr/lib/x86_64-linux-gnu/libzfs.so*
+      - usr/lib/x86_64-linux-gnu/libzpool.so*
+      - usr/lib/x86_64-linux-gnu/libnvpair.so*
+      - usr/lib/x86_64-linux-gnu/libuutil.so*
 
 apps:
   zpool:
