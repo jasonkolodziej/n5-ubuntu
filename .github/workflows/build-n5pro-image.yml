@@ -26,7 +26,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install snapcraft
         run: |
@@ -46,7 +46,7 @@ jobs:
           fi
 
       - name: Upload built snaps
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: built-snaps
           path: built-snaps/*.snap
@@ -64,14 +64,14 @@ jobs:
     
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install ubuntu-image
         run: |
           sudo snap install ubuntu-image --classic
 
       - name: Download built snaps
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: built-snaps
           path: snaps
@@ -179,7 +179,7 @@ jobs:
           xz -T0 -v *.img || true
 
       - name: Upload image artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ubuntu-core-24-n5pro-${{ github.run_number }}
           path: build/*.img*
@@ -193,7 +193,7 @@ jobs:
       contents: write
     steps:
       - name: Download image artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: ubuntu-core-24-n5pro-${{ github.run_number }}
           path: build
