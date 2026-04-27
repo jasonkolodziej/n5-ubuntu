@@ -225,6 +225,37 @@ ssh user@n5-ip my-helpers.my-script
 
 See [snaps/example-helpers/README.md](../snaps/example-helpers/README.md) for complete templates, hook examples, and confinement guidance.
 
+### Enabling ZFS Data-Pool Tooling In The Image
+
+This repo includes a local `snaps/zfs-tools/` source snap that packages `zpool` and `zfs` userspace commands for Ubuntu Core data-pool setup.
+
+Build it locally:
+
+```bash
+cd snaps/zfs-tools
+chmod +x bin/*.sh hooks/*
+snapcraft pack --destructive-mode --verbose
+mv zfs-tools_*.snap ../
+```
+
+Then build the image as usual. Any `.snap` files in `snaps/` are included automatically.
+
+On first boot, configure optional auto-create with stable disk IDs:
+
+```bash
+sudo snap set zfs-tools auto-create=true
+sudo snap set zfs-tools confirm-default-layout=true
+sudo snap set zfs-tools pool-name=tank
+sudo snap set zfs-tools devices=/dev/disk/by-id/ata-DISK1,/dev/disk/by-id/ata-DISK2
+sudo snap restart zfs-tools.auto-init
+zfs-tools.status
+```
+
+Important:
+
+- `zfs-tools` is currently packaged as a local devmode snap for dangerous image flows.
+- The kernel must provide ZFS module support (`/dev/zfs` present) for pool commands to work.
+
 ### Custom Gadget
 
 For custom boot configuration, kernel parameters, or GRUB changes:

@@ -34,16 +34,39 @@ jobs:
 
       - name: Build example-helpers snap
         run: |
-          if [ -d "snaps/example-helpers" ]; then
-            chmod +x snaps/example-helpers/bin/*.sh snaps/example-helpers/hooks/*
-            cd snaps/example-helpers
+          mkdir -p built-snaps
+
+          shopt -s nullglob
+          snap_dirs=(snaps/*)
+          built_count=0
+
+          for snap_dir in "${snap_dirs[@]}"; do
+            if [ ! -f "$snap_dir/snap/snapcraft.yaml" ]; then
+              continue
+            fi
+
+            echo "Building snap source: $snap_dir"
+            [ -d "$snap_dir/bin" ] && chmod +x "$snap_dir"/bin/*.sh || true
+            [ -d "$snap_dir/hooks" ] && chmod +x "$snap_dir"/hooks/* || true
+
+            pushd "$snap_dir" >/dev/null
             snapcraft pack --destructive-mode --verbose
-            cd ../..
-            mkdir -p built-snaps
-            mv snaps/example-helpers/*.snap built-snaps/ || true
-          else
-            echo "example-helpers source not found, skipping"
-          fi
+            popd >/dev/null
+
+            moved=false
+            for snap_file in "$snap_dir"/*.snap; do
+              mv "$snap_file" built-snaps/
+              moved=true
+              built_count=$((built_count + 1))
+            done
+
+            if [ "$moved" = false ]; then
+              echo "error: no .snap artifact produced in $snap_dir" >&2
+              exit 1
+            fi
+          done
+
+          echo "Built $built_count snap artifact(s)."
 
       - name: Upload built snaps
         uses: actions/upload-artifact@v5
@@ -215,6 +238,7 @@ jobs:
             - core24
             - snapd
             - console-conf (for initial setup)
+            - Any locally built snap artifacts from `snaps/*` source directories
             
             ## Usage
             1. Download the `.img.xz` artifact

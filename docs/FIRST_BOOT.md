@@ -318,6 +318,52 @@ sudo mount /dev/sdb1 /mnt/data
 
 # Check mount
 mount | grep /mnt/data
+
+## Step 13: Enable ZFS Data Pool (Optional, Recommended For NAS)
+
+If your image includes the local `zfs-tools` snap, you can initialize a ZFS pool for your data disks.
+
+1. Confirm tools and kernel support:
+
+```bash
+zfs-tools.status
+```
+
+1. Identify stable disk IDs (recommended instead of `/dev/sdX`):
+
+```bash
+ls -l /dev/disk/by-id
+```
+
+1. Configure one-time automatic pool creation:
+
+```bash
+sudo snap set zfs-tools auto-create=true
+sudo snap set zfs-tools confirm-default-layout=true
+sudo snap set zfs-tools pool-name=tank
+sudo snap set zfs-tools devices=/dev/disk/by-id/ata-DISK1,/dev/disk/by-id/ata-DISK2
+sudo snap restart zfs-tools.auto-init
+```
+
+1. Validate pool and datasets:
+
+```bash
+zfs-tools.zpool status
+zfs-tools.zfs list
+```
+
+Manual alternative:
+
+```bash
+zfs-tools.init-pool tank /dev/disk/by-id/ata-DISK1 /dev/disk/by-id/ata-DISK2
+```
+
+Notes:
+
+- This flow is for data pools on Ubuntu Core, not replacing the Ubuntu Core root filesystem.
+- Auto-create only runs after explicit confirmation with `confirm-default-layout=true`.
+- If `zfs-tools.status` reports `/dev/zfs` missing, use a kernel build that includes ZFS module support.
+
 ```
 
 To mount permanently on boot, edit `/etc/fstab`:

@@ -1,0 +1,15 @@
+#!/bin/bash
+
+set -eu
+
+AUTO_CREATE="$(snapctl get auto-create || true)"
+POOL_NAME="$(snapctl get pool-name || true)"
+DEVICES="$(snapctl get devices || true)"
+
+echo "zfs-tools: configure hook"
+echo "  auto-create=${AUTO_CREATE:-false}"
+echo "  pool-name=${POOL_NAME:-tank}"
+
+if [ "$AUTO_CREATE" = "true" ] && [ -z "$DEVICES" ]; then
+  echo "zfs-tools: warning: auto-create=true but devices is empty"
+fi

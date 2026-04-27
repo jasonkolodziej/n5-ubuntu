@@ -1,0 +1,85 @@
+name: zfs-tools
+title: N5 ZFS Tools
+version: '1.0'
+summary: ZFS userspace tools and bootstrap helpers for Ubuntu Core 24
+description: |
+  This snap ships ZFS userspace commands and helper scripts for initializing
+  and validating data pools on Ubuntu Core 24 images for the N5 Pro.
+  It is intended for local, dangerous image builds where devmode snaps are
+  acceptable for storage bootstrap tasks.
+license: GPL-2.0-only
+contact: https://github.com/jasonkolodziej/n5-ubuntu/issues
+issues: https://github.com/jasonkolodziej/n5-ubuntu/issues
+source-code: https://github.com/jasonkolodziej/n5-ubuntu
+website: https://github.com/jasonkolodziej/n5-ubuntu
+
+base: core24
+confinement: devmode
+grade: devel
+
+parts:
+  scripts:
+    plugin: dump
+    source: .
+    organize:
+      bin/* : bin/
+      hooks/* : hooks/
+
+  zfs-userspace:
+    plugin: nil
+    stage-packages:
+      - zfsutils-linux
+
+apps:
+  zpool:
+    command: usr/sbin/zpool
+    plugs:
+      - block-devices
+      - hardware-observe
+      - mount-observe
+      - system-observe
+
+  zfs:
+    command: usr/sbin/zfs
+    plugs:
+      - block-devices
+      - hardware-observe
+      - mount-observe
+      - system-observe
+
+  status:
+    command: bin/status.sh
+    plugs:
+      - block-devices
+      - hardware-observe
+      - mount-observe
+      - system-observe
+
+  init-pool:
+    command: bin/init-pool.sh
+    plugs:
+      - block-devices
+      - hardware-observe
+      - mount-observe
+      - system-observe
+
+  auto-init:
+    command: bin/auto-init.sh
+    daemon: simple
+    restart-condition: on-failure
+    plugs:
+      - block-devices
+      - hardware-observe
+      - mount-observe
+      - system-observe
+
+hooks:
+  install:
+    plugs:
+      - system-observe
+  configure:
+    plugs:
+      - block-devices
+      - hardware-observe
+      - mount-observe
+      - system-observe

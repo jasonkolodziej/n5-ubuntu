@@ -1,0 +1,3 @@
+#!/bin/bash
+
+echo "zfs-tools: install hook running"
