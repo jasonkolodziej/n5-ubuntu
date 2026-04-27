@@ -42,11 +42,13 @@ sudo snap install snapcraft --classic
 # Navigate to the snap directory
 cd snaps/example-helpers
 
-# Build the snap
-snapcraft pack --verbose
+# Build the snap without LXD
+snapcraft pack --destructive-mode --verbose
 
 # Output: example-helpers_1.0_amd64.snap
 ```
+
+`--destructive-mode` is used here because this snap is built from a simple local dump layout and does not need an LXD build environment. GitHub Actions uses the same mode to avoid runner-side LXD group setup.
 
 To include the snap in a local image build:
 

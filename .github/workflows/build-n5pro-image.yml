@@ -36,7 +36,7 @@ jobs:
         run: |
           if [ -d "snaps/example-helpers" ]; then
             cd snaps/example-helpers
-            snapcraft pack --verbose
+            snapcraft pack --destructive-mode --verbose
             cd ../..
             mkdir -p built-snaps
             mv snaps/example-helpers/*.snap built-snaps/ || true
