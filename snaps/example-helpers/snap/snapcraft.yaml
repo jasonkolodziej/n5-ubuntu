@@ -1,10 +1,17 @@
 name: example-helpers
+title: N5 Example Helpers
 version: '1.0'
 summary: Example helper scripts for Ubuntu Core 24 on N5 Pro
 description: |
   This snap provides example helper scripts for common system administration
   tasks on Ubuntu Core 24. Customize for your needs by modifying the scripts
   and rebuilding.
+license: GPL-3.0-only
+contact: https://github.com/jasonkolodziej/n5-ubuntu/issues
+issues: https://github.com/jasonkolodziej/n5-ubuntu/issues
+source-code: https://github.com/jasonkolodziej/n5-ubuntu
+website: https://github.com/jasonkolodziej/n5-ubuntu
+donation: https://github.com/sponsors
 
 base: core24
 confinement: strict

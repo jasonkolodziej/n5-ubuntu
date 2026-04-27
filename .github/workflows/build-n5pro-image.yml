@@ -35,6 +35,7 @@ jobs:
       - name: Build example-helpers snap
         run: |
           if [ -d "snaps/example-helpers" ]; then
+            chmod +x snaps/example-helpers/bin/*.sh snaps/example-helpers/hooks/*
             cd snaps/example-helpers
             snapcraft pack --destructive-mode --verbose
             cd ../..
