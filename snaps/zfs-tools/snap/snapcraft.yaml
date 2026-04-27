@@ -40,8 +40,9 @@ parts:
       apt-get download zfsutils-linux >/dev/null 2>&1 && {
         deb=$(ls zfsutils-linux*.deb 2>/dev/null | head -1)
         if [ -n "$deb" ] && [ -f "$deb" ]; then
-          # Extract with --no-xattrs to avoid extended attribute errors on GitHub Actions
-          tar --no-xattrs -xf "$deb" -C "$SNAPCRAFT_PART_INSTALL" ./usr/sbin/zpool ./usr/sbin/zfs 2>/dev/null || true
+          # Extract .deb (which is an ar archive) using dpkg-deb
+          # This properly extracts without attempting to write extended attributes
+          dpkg-deb -x "$deb" "$SNAPCRAFT_PART_INSTALL" 2>/dev/null || true
           rm -f "$deb"
         fi
       } || true
