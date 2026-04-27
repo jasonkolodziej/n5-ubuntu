@@ -27,31 +27,28 @@ parts:
 
   zfs-userspace:
     plugin: nil
-    override-pull: |
-      set -e
-      export DEBIAN_FRONTEND=noninteractive
+    stage-packages:
+      - libzfs4linux
+      - libzpool5linux
+      - libnvpair3linux
+      - libuutil3linux
+    override-build: |
+      # Manually extract zfsutils-linux binaries with --no-xattrs to avoid GitHub Actions xattr errors
       mkdir -p "$SNAPCRAFT_PART_INSTALL/usr/sbin"
-      mkdir -p "$SNAPCRAFT_PART_INSTALL/usr/lib/x86_64-linux-gnu"
+      cd /tmp
+      apt-get update >/dev/null 2>&1 || true
+      apt-get download zfsutils-linux >/dev/null 2>&1 && {
+        deb=$(ls zfsutils-linux*.deb 2>/dev/null | head -1)
+        if [ -n "$deb" ] && [ -f "$deb" ]; then
+          # Extract with --no-xattrs to avoid extended attribute errors on GitHub Actions
+          tar --no-xattrs -xf "$deb" -C "$SNAPCRAFT_PART_INSTALL" ./usr/sbin/zpool ./usr/sbin/zfs 2>/dev/null || true
+          rm -f "$deb"
+        fi
+      } || true
       
-      # Download ZFS packages and extract binaries directly with --no-xattrs to avoid extended attribute errors
-      for pkg in zfsutils-linux libzfs4linux libzpool5linux libnvpair3linux libuutil3linux; do
-        echo "Downloading $pkg..."
-        apt-get download "$pkg" 2>/dev/null || echo "Failed to download $pkg, skipping"
-        for deb in ${pkg}*.deb; do
-          if [ -f "$deb" ]; then
-            echo "Extracting $deb with --no-xattrs..."
-            tar --no-xattrs -xf "$deb" -C "$SNAPCRAFT_PART_INSTALL" 2>/dev/null || true
-            rm -f "$deb"
-          fi
-        done
-      done
-      
-      # Remove system files that cause issues
+      # Clean up system files not needed in snap
       rm -rf "$SNAPCRAFT_PART_INSTALL/etc" || true
       rm -rf "$SNAPCRAFT_PART_INSTALL/usr/share" || true
-    override-build: |
-      # Build phase is a no-op; all work done in pull
-      true
 
 apps:
   zpool:
