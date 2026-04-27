@@ -1,0 +1,78 @@
+{
+	"folders": [
+		{
+			"name": "root_dir",
+			"path": "."
+		},
+		{
+			"name": "github",
+			"path": ".github"
+		},
+		{
+			"name": "gadgets",
+			"path": "gadget"
+		},
+		{
+			"name": "model-assertion",
+			"path": "model-assertion"
+		},
+		{
+			"name": "snaps",
+			"path": "snaps"
+		}
+	],
+	"extensions": {
+		"recommendations": [
+			"aaron-bond.better-comments",
+			"kevinkyang.auto-comment-blocks",
+			"bierner.github-markdown-preview",
+			"biomejs.biome",
+			"DavidAnson.vscode-markdownlint"
+		]
+	},
+	"settings": {
+		"files.associations": {
+			"wrangler.json": "jsonc",
+			"*.css": "tailwindcss",
+			"*.svelte": "svelte",
+			".code-workspace": "jsonc"
+		},
+		"editor.defaultFormatter": "biomejs.biome",
+		"editor.formatOnSave": true,
+		"biome.requireConfiguration": true,
+		"biome.suggestInstallingGlobally": false,
+		"biome.configurationPath": "./biome.json",
+		"workbench.browser.enableChatTools": true,
+		"workbench.browser.openLocalhostLinks": true,
+		"chat.tools.terminal.autoApprove": {
+			"pnpm": true
+		},
+		"[markdown]": {
+			"editor.formatOnSave": true,
+			"editor.defaultFormatter": "DavidAnson.vscode-markdownlint",
+			"editor.codeActionsOnSave": {
+				"source.fixAll.markdownlint": "explicit"
+			}
+		},
+		"[json]": {
+			"editor.defaultFormatter": "vscode.json-language-features"
+		},
+		"[jsonc]": {
+			"editor.defaultFormatter": "biomejs.biome"
+		},
+		"[svelte]": {
+			"editor.defaultFormatter": "svelte.svelte-vscode"
+		},
+		"github-actions.workflows.pinned.refresh.enabled": true,
+		"sonarlint.connectedMode.project": {
+			"connectionId": "jasonkolodziej",
+			"projectKey": "jasonkolodziej_reveille.dev"
+		},
+		"markdownlint.config": {
+			"MD060": {
+				"aligned_delimiter": true,
+				"style": "compact"
+			}
+		}
+	}
+}

@@ -2,3 +2,4 @@
 **/*.env
 **-gnupg*
 **/snapcraft*-credentials**
+node_modules/

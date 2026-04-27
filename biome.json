@@ -1,0 +1,36 @@
+{
+	"files": {
+		"includes": [
+			"**",
+			"!.github",
+			"!gadget",
+			"!model-assertion",
+			"!snaps"
+		]
+	},
+	"vcs": {
+		"enabled": true,
+		"clientKind": "git",
+		"useIgnoreFile": true,
+		"defaultBranch": "main"
+	},
+	"formatter": {
+		"enabled": true,
+		"indentStyle": "tab"
+	},
+	"linter": {
+		"rules": {
+			"recommended": true,
+			"suspicious": {
+				"useBiomeIgnoreFolder": "error"
+			}
+		}
+	},
+	"assist": {
+		"actions": {
+			"source": {
+				"organizeImports": "on"
+			}
+		}
+	}
+}
