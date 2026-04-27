@@ -14,6 +14,8 @@ Prefer the smallest validation that matches the files you changed.
 - For workspace config or JSON-like repo files covered by Biome, use `pnpm exec biome check .` from the repo root.
 - Do not assume Biome covers `.github/`, `gadget/`, `model-assertion/`, or `snaps/`; `biome.json` currently excludes those directories.
 - For workflow or shell-script changes, validate by reading the surrounding docs and keeping commands consistent between `.github/workflows/` and `.ubuntu/README.md`.
+- For Snapcraft packaging in `snaps/`, ensure required metadata is present in `snap/snapcraft.yaml` (at minimum `title`, `contact`, and `license`) and make script/hook files executable before packing.
+- On GitHub-hosted runners, prefer `snapcraft pack --destructive-mode` for local dump-style snaps and normalize mode bits in CI (`chmod +x snaps/<name>/bin/*.sh snaps/<name>/hooks/*`) before `snapcraft pack`.
 
 ## Conventions
 - Keep edits narrow and preserve the existing structure; this repo is mostly configuration, docs, and build orchestration.
