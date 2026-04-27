@@ -134,6 +134,9 @@ Captures comprehensive storage layout: block devices, NVMe/SATA drives, ZFS pool
 
 ```bash
 example-helpers.storage-inventory
+
+# Mermaid diagram output
+example-helpers.storage-inventory --mermaid
 ```
 
 **Remote mode** - Inventory storage on the N5 Pro from another machine:
@@ -143,6 +146,9 @@ N5_HOST=192.168.1.100 N5_USER=ubuntu example-helpers.storage-inventory --remote
 
 # With SSH key
 N5_HOST=192.168.1.100 N5_USER=ubuntu N5_SSH_KEY=~/.ssh/id_ed25519 example-helpers.storage-inventory --remote
+
+# Mermaid diagram over SSH
+N5_HOST=192.168.1.100 N5_USER=ubuntu example-helpers.storage-inventory --remote --mermaid
 ```
 
 Output includes:

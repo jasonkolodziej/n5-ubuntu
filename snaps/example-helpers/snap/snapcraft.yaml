@@ -40,6 +40,7 @@ apps:
   storage-inventory:
     command: bin/storage-inventory.sh
     plugs:
+      - network
       - hardware-observe
       - system-observe
       - home

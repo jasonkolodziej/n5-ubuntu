@@ -1,207 +1,424 @@
 #!/usr/bin/env bash
 
 # Storage Inventory Script for N5 Pro
-# Captures current storage layout: drives, partitions, pools, datasets, and hardware info
+# Captures storage layout: drives, partitions, labels, pools, datasets, hardware info
+# Flags:
+#   --remote   run over SSH to N5 host instead of this machine
+#   --mermaid  emit mermaid diagram code
 
 set -euo pipefail
 
 MODE="local"
-if [[ "${1:-}" == "--remote" ]]; then
-  MODE="remote"
-fi
+FORMAT="human"
+for arg in "$@"; do
+    case "$arg" in
+        --local) MODE="local" ;;
+        --remote) MODE="remote" ;;
+        --mermaid) FORMAT="mermaid" ;;
+    esac
+done
 
 N5_HOST="${N5_HOST:-}"
 N5_USER="${N5_USER:-ubuntu}"
 N5_SSH_KEY="${N5_SSH_KEY:-}"
 
-# Colors for output
-BOLD='\033[1m'
-BLUE='\033[0;34m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RESET='\033[0m'
-
-print_section() {
-    echo -e "\n${BOLD}${BLUE}=== $1 ===${RESET}\n"
+init_colors() {
+    BOLD='\033[1m'
+    BLUE='\033[0;34m'
+    CYAN='\033[0;36m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    RED='\033[0;31m'
+    DIM='\033[2m'
+    RESET='\033[0m'
 }
 
-print_subsection() {
-    echo -e "${BOLD}${GREEN}$1${RESET}"
+section() {
+    echo -e "\n${BOLD}${BLUE}===== $1 =====${RESET}\n"
+}
+
+warn() {
+    echo -e "${YELLOW}!${RESET} $1"
+}
+
+table() {
+    if command -v column >/dev/null 2>&1; then
+        column -t -s $'\t' | sed 's/^/  /'
+    else
+        sed 's/^/  /'
+    fi
+}
+
+is_stale_label() {
+    local disk_base="$1"
+    local partlabel="$2"
+    [[ -z "$partlabel" ]] && return 1
+    if [[ "$partlabel" =~ ^(nvme[0-9]+n[0-9]+|sd[a-z]+) ]]; then
+        [[ "${BASH_REMATCH[1]}" != "$disk_base" ]] && return 0
+    fi
+    return 1
 }
 
 run_inventory() {
-    # Check if running as root (some commands may need elevated privileges)
+    init_colors
+
     if [[ $EUID -ne 0 ]]; then
-        echo -e "${YELLOW}⚠️  Some information may be limited without root privileges${RESET}"
-        echo "    Run with 'sudo' for complete hardware details"
+        warn "Some information may be limited without root privileges (run with sudo for full detail)"
     fi
 
-    print_section "BLOCK DEVICES OVERVIEW"
-    lsblk -o NAME,SIZE,TYPE,MODEL,SERIAL,LABEL || lsblk
+    echo -e "${BOLD}${BLUE}N5 Pro Storage Inventory${RESET} ${DIM}$(date '+%Y-%m-%d %H:%M:%S')${RESET}"
 
-    print_section "NVMe DRIVES (nvme0 - nvme2)"
-    for nvme in /dev/nvme0n1 /dev/nvme1n1 /dev/nvme2n1; do
-        if [[ -b "$nvme" ]]; then
-            print_subsection "$(basename $nvme)"
-            
-            # Get capacity
-            capacity=$(lsblk -b -n -d -o SIZE "$nvme" | awk '{print $1/1024/1024/1024 " GB"}')
-            echo "Capacity: $capacity"
-            
-            # Try to get model info via nvme-cli if available
-            if command -v nvme &> /dev/null; then
-                echo "Model: $(sudo nvme id-ctrl -H "$nvme" 2>/dev/null | grep '^Model Number' | cut -d: -f2- | xargs || echo 'N/A')"
-                echo "Serial: $(sudo nvme id-ctrl -H "$nvme" 2>/dev/null | grep '^Serial Number' | cut -d: -f2- | xargs || echo 'N/A')"
-            else
-                # Fallback via lsblk
-                model=$(lsblk -n -d -o MODEL "$nvme" || echo "N/A")
-                serial=$(lsblk -n -d -o SERIAL "$nvme" || echo "N/A")
-                echo "Model: $model"
-                echo "Serial: $serial"
-            fi
-            
-            # Show partitions and labels
-            echo "Partitions:"
-            blkid "$nvme"* 2>/dev/null || echo "  (no partitions found)"
-            echo ""
-        fi
-    done
-
-    print_section "SATA DRIVES (sda - sde)"
-    for sata in /dev/sd{a,b,c,d,e}; do
-        if [[ -b "$sata" ]]; then
-            print_subsection "$(basename $sata)"
-            
-            # Get capacity
-            capacity=$(lsblk -b -n -d -o SIZE "$sata" 2>/dev/null | awk '{print $1/1024/1024/1024 " GB"}')
-            model=$(lsblk -n -d -o MODEL "$sata" 2>/dev/null || echo "N/A")
-            serial=$(lsblk -n -d -o SERIAL "$sata" 2>/dev/null || echo "N/A")
-            
-            echo "Capacity: $capacity"
-            echo "Manufacturer/Model: $model"
-            echo "Serial Number: $serial"
-            
-            # Try to get additional info via smartctl if available
-            if command -v smartctl &> /dev/null; then
-                sudo smartctl -i "$sata" 2>/dev/null | grep -E "Device Model|Serial Number|Capacity" || true
-            fi
-            
-            # Show partition labels
-            echo "Partitions:"
-            blkid "$sata"* 2>/dev/null || echo "  (no partitions found)"
-            echo ""
-        fi
-    done
-
-    print_section "ZFS POOL STATUS"
-    if command -v zpool &> /dev/null; then
-        zpool list -H
-        echo ""
-        zpool status
-    else
-        echo "⚠️  ZFS tools not available"
-    fi
-
-    print_section "ZFS DATASETS"
-    if command -v zfs &> /dev/null; then
-        zfs list -H || echo "No datasets found"
-    else
-        echo "⚠️  ZFS tools not available"
-    fi
-
-    print_section "PARTITION LABELS AND UUIDs"
-    blkid
-
-    print_section "MOUNT POINTS AND USAGE"
-    df -h | grep -E "^/dev/|Filesystem"
-
-    print_section "L2ARC CACHE CONFIGURATION"
-    if command -v zpool &> /dev/null; then
-        echo "Cache devices (from 'zpool status'):"
-        zpool status | grep -A 10 "cache" || echo "No L2ARC cache configured"
-    else
-        echo "⚠️  ZFS tools not available"
-    fi
-
-    print_section "ZFS ARC MEMORY CONFIGURATION"
-    if [[ -f /proc/spl/kstat/zfs/arcstats ]]; then
-        echo "Current ARC Stats:"
-        grep -E "^c |^c_max |^c_min " /proc/spl/kstat/zfs/arcstats | head -3
-        
-        if [[ -f /etc/modprobe.d/zfs.conf ]]; then
-            echo -e "\nZFS Module Configuration:"
-            cat /etc/modprobe.d/zfs.conf | grep -E "zfs_arc" || echo "  (using defaults)"
-        fi
-    else
-        echo "ZFS ARC statistics not available (ZFS not loaded?)"
-    fi
-
-    print_section "NVME CACHE POOL (if configured)"
-    if lsblk -n -o PARTLABEL | grep -q "nvme-cache"; then
-        echo "nvme-cache partition(s) found:"
-        blkid | grep nvme-cache
-        
-        # Check if mounted
-        if grep -q "nvme-cache" /proc/mounts; then
-            echo "Mount point(s):"
-            mount | grep nvme-cache
-        fi
-    else
-        echo "No nvme-cache partition labels found"
-    fi
-
-    print_section "AI HOT TIER (if configured)"
-    if [[ -d /var/nas/ai-hot-tier ]]; then
-        echo "Mount point exists: /var/nas/ai-hot-tier"
-        df -h /var/nas/ai-hot-tier || echo "  (directory not currently mounted)"
-    else
-        echo "AI hot tier directory not found"
-    fi
-
-    print_section "SYSTEMD ZFS SERVICES STATUS"
-    if command -v systemctl &> /dev/null; then
-        for service in zfs-import-nas zfs-import-cache zfs-mount; do
-            echo "Service: $service"
-            systemctl is-active "$service" 2>/dev/null || echo "  (not found or inactive)"
+    section "PHYSICAL DRIVES"
+    {
+        printf "DEVICE\tSIZE\tMODEL\tSERIAL\n"
+        lsblk -d -n -o NAME,SIZE,MODEL,SERIAL 2>/dev/null | while read -r name size model serial; do
+            printf "/dev/%s\t%s\t%s\t%s\n" "$name" "$size" "${model:-(n/a)}" "${serial:-(n/a)}"
         done
+    } | table
+
+    section "PARTITION MAP"
+    {
+        printf "PARTITION\tSIZE\tFSTYPE\tPARTLABEL\tLABEL\tUUID8\tSTATUS\n"
+        local NAME="" SIZE="" PKNAME="" TYPE="" FSTYPE="" PARTLABEL="" LABEL="" UUID=""
+        while IFS= read -r line; do
+            NAME=""; SIZE=""; PKNAME=""; TYPE=""; FSTYPE=""; PARTLABEL=""; LABEL=""; UUID=""
+            eval "$line" 2>/dev/null || continue
+            [[ "$TYPE" != "part" ]] && continue
+            local status="OK"
+            is_stale_label "$PKNAME" "$PARTLABEL" && status="STALE"
+            printf "/dev/%s\t%s\t%s\t%s\t%s\t%s\t%s\n" \
+                "$NAME" "$SIZE" "${FSTYPE:--}" "${PARTLABEL:--}" "${LABEL:--}" "${UUID:0:8}" "$status"
+        done < <(lsblk -P -o NAME,SIZE,PKNAME,TYPE,FSTYPE,PARTLABEL,LABEL,UUID 2>/dev/null)
+    } | table
+
+    section "ZFS POOLS"
+    if command -v zpool >/dev/null 2>&1; then
+        {
+            printf "POOL\tSIZE\tUSED\tFREE\tHEALTH\n"
+            zpool list -H -o name,size,alloc,free,health 2>/dev/null | \
+                while IFS=$'\t' read -r name size alloc free health; do
+                    printf "%s\t%s\t%s\t%s\t%s\n" "$name" "$size" "$alloc" "$free" "$health"
+                done
+        } | table
+        echo
+        echo "  zpool status:"
+        zpool status 2>/dev/null | sed 's/^/    /'
     else
-        echo "⚠️  systemctl not available"
+        echo "  zpool not available"
     fi
 
-    print_section "STORAGE SUMMARY"
-    echo "Total block devices:"
-    lsblk -n -d | wc -l
-
-    if command -v zpool &> /dev/null; then
-        echo "ZFS pools:"
-        zpool list -H | wc -l
+    section "ZFS DATASETS"
+    if command -v zfs >/dev/null 2>&1; then
+        {
+            printf "DATASET\tUSED\tAVAIL\tREFER\tMOUNTPOINT\n"
+            zfs list -H -o name,used,avail,refer,mountpoint 2>/dev/null | \
+                while IFS=$'\t' read -r name used avail refer mountpoint; do
+                    printf "%s\t%s\t%s\t%s\t%s\n" "$name" "$used" "$avail" "$refer" "$mountpoint"
+                done
+        } | table
+    else
+        echo "  zfs not available"
     fi
 
-    echo -e "\n${BOLD}✓ Storage inventory complete${RESET}\n"
+    section "ZFS POOL OPTIONS"
+    if command -v zpool >/dev/null 2>&1; then
+        {
+            printf "POOL\tPROPERTY\tVALUE\tSOURCE\n"
+            while IFS=$'\t' read -r pool; do
+                zpool get -H -o name,property,value,source all "$pool" 2>/dev/null || true
+            done < <(zpool list -H -o name 2>/dev/null)
+        } | table
+    else
+        echo "  zpool not available"
+    fi
+
+    section "ZFS ROOT DATASET OPTIONS"
+    if command -v zfs >/dev/null 2>&1; then
+        {
+            printf "DATASET\tPROPERTY\tVALUE\tSOURCE\n"
+            while IFS=$'\t' read -r pool; do
+                zfs get -H -o name,property,value,source all "$pool" 2>/dev/null || true
+            done < <(zpool list -H -o name 2>/dev/null)
+        } | table
+    else
+        echo "  zfs not available"
+    fi
+
+    section "MOUNT POINTS"
+    {
+        printf "FILESYSTEM\tSIZE\tUSED\tAVAIL\tUSEPCT\tMOUNTED_ON\n"
+        df -h | grep '^/dev/' | while read -r fs size used avail pct mount; do
+            printf "%s\t%s\t%s\t%s\t%s\t%s\n" "$fs" "$size" "$used" "$avail" "$pct" "$mount"
+        done
+    } | table
+
+    section "NVME CACHE LABELS"
+    if lsblk -n -o PARTLABEL 2>/dev/null | grep -qE 'nvme.*-cache-p[0-9]+|nvme-cache'; then
+        {
+            printf "PARTITION\tSIZE\tPARTLABEL\tTYPE\n"
+            lsblk -r -n -o NAME,SIZE,PARTLABEL,TYPE 2>/dev/null | grep -E 'nvme.*-cache-p[0-9]+|nvme-cache' | \
+                while read -r name size partlabel type; do
+                    printf "/dev/%s\t%s\t%s\t%s\n" "$name" "$size" "$partlabel" "$type"
+                done
+        } | table
+        blkid 2>/dev/null | grep -E 'nvme.*-cache-p[0-9]+|nvme-cache' | sed 's/^/  /' || true
+    else
+        echo "  No nvme cache partition labels found"
+    fi
+
+    section "NVME AI HOT LABELS"
+    if lsblk -n -o PARTLABEL 2>/dev/null | grep -qE 'nvme.*-ai-hot|nvme-ai-hot'; then
+        {
+            printf "PARTITION\tSIZE\tPARTLABEL\tTYPE\n"
+            lsblk -r -n -o NAME,SIZE,PARTLABEL,TYPE 2>/dev/null | grep -E 'nvme.*-ai-hot|nvme-ai-hot' | \
+                while read -r name size partlabel type; do
+                    printf "/dev/%s\t%s\t%s\t%s\n" "$name" "$size" "$partlabel" "$type"
+                done
+        } | table
+        local dup_count
+        dup_count=$(lsblk -n -o PARTLABEL 2>/dev/null | grep -cE 'nvme.*-ai-hot|nvme-ai-hot' || true)
+        if [[ "$dup_count" -gt 1 ]]; then
+            warn "$dup_count ai-hot labels detected; stale labels likely present"
+            warn "Run: make apply-local ARGS='-replace=\"module.storage_nvme_cache[0].null_resource.nvme_cache\"'"
+        fi
+    else
+        echo "  No nvme ai-hot partition labels found"
+    fi
+
+    section "ARC CONFIG"
+    if [[ -f /proc/spl/kstat/zfs/arcstats ]]; then
+        {
+            printf "SETTING\tVALUE\n"
+            awk '
+                $1=="c"     {printf "arc_target\t%.1f GiB\n", $3/1073741824}
+                $1=="c_min" {printf "arc_min\t%.1f GiB\n", $3/1073741824}
+                $1=="c_max" {printf "arc_max\t%.1f GiB\n", $3/1073741824}
+            ' /proc/spl/kstat/zfs/arcstats
+        } | table
+        if [[ -f /etc/modprobe.d/zfs.conf ]]; then
+            echo
+            grep -E 'zfs_arc' /etc/modprobe.d/zfs.conf | sed 's/^/  /' || echo "  using defaults"
+        fi
+    else
+        echo "  ARC stats unavailable"
+    fi
+
+    section "SYSTEMD ZFS SERVICES"
+    if command -v systemctl >/dev/null 2>&1; then
+        {
+            printf "SERVICE\tSTATUS\n"
+            for service in zfs-import-nas zfs-import-cache zfs-mount zfs-zed; do
+                status=$(systemctl is-active "$service" 2>/dev/null || true)
+                [[ -z "$status" ]] && status="not-found"
+                printf "%s\t%s\n" "$service" "$status"
+            done
+        } | table
+    else
+        echo "  systemctl not available"
+    fi
+
+    section "SUMMARY"
+    {
+        printf "METRIC\tVALUE\n"
+        printf "block_devices\t%s\n" "$(lsblk -d -n | wc -l)"
+        printf "zfs_pools\t%s\n" "$(zpool list -H 2>/dev/null | wc -l || echo 0)"
+        printf "zfs_datasets\t%s\n" "$(zfs list -H 2>/dev/null | wc -l || echo 0)"
+        stale_count=$(lsblk -P -o PKNAME,PARTLABEL 2>/dev/null | \
+            while IFS= read -r line; do
+                PKNAME=""; PARTLABEL=""; eval "$line" 2>/dev/null || true
+                is_stale_label "$PKNAME" "$PARTLABEL" && echo 1
+            done | wc -l)
+        printf "stale_partlabels\t%s\n" "$stale_count"
+    } | table
+
+    echo
+    echo -e "${BOLD}${GREEN}Storage inventory complete${RESET}"
+}
+
+generate_mermaid() {
+    declare -A disk_size disk_model
+    declare -A part_parent part_size part_fstype part_partlabel part_label
+    declare -a disks parts
+
+    local NAME="" SIZE="" TYPE="" PKNAME="" MODEL="" SERIAL="" FSTYPE="" PARTLABEL="" LABEL="" UUID=""
+    while IFS= read -r line; do
+        NAME=""; SIZE=""; TYPE=""; PKNAME=""; MODEL=""; SERIAL=""; FSTYPE=""; PARTLABEL=""; LABEL=""; UUID=""
+        eval "$line" 2>/dev/null || continue
+        if [[ "$TYPE" == "disk" ]]; then
+            disks+=("$NAME")
+            disk_size["$NAME"]="$SIZE"
+            disk_model["$NAME"]="${MODEL:-unknown}"
+        elif [[ "$TYPE" == "part" ]]; then
+            parts+=("$NAME")
+            part_parent["$NAME"]="$PKNAME"
+            part_size["$NAME"]="$SIZE"
+            part_fstype["$NAME"]="$FSTYPE"
+            part_partlabel["$NAME"]="$PARTLABEL"
+            part_label["$NAME"]="$LABEL"
+        fi
+    done < <(lsblk -P -o NAME,SIZE,TYPE,PKNAME,MODEL,SERIAL,FSTYPE,PARTLABEL,LABEL,UUID 2>/dev/null)
+
+    declare -A pool_health
+    declare -a pools
+    while IFS=$'\t' read -r name size alloc free health; do
+        pools+=("$name")
+        pool_health["$name"]="$health"
+    done < <(zpool list -H -o name,size,alloc,free,health 2>/dev/null || true)
+
+    declare -A vdev_state vdev_pool cache_state cache_pool
+    declare -a vdevs caches
+    local current_pool=""
+    local in_cache=0
+    local trimmed="" dev="" st=""
+    while IFS= read -r raw; do
+        trimmed="$(echo "$raw" | sed -E 's/^[[:space:]]+//')"
+        if [[ "$trimmed" =~ ^pool:[[:space:]]+(.+) ]]; then
+            current_pool="${BASH_REMATCH[1]}"
+            in_cache=0
+        elif [[ "$trimmed" == "cache" ]]; then
+            in_cache=1
+        elif [[ "$trimmed" =~ ^([^[:space:]]+)[[:space:]]+(ONLINE|DEGRADED|FAULTED|UNAVAIL|REMOVED) ]]; then
+            dev="${BASH_REMATCH[1]}"
+            st="${BASH_REMATCH[2]}"
+            [[ "$dev" == "NAME" || "$dev" == "$current_pool" || "$dev" == "state:" ]] && continue
+            if [[ $in_cache -eq 1 ]]; then
+                caches+=("$dev")
+                cache_state["$dev"]="$st"
+                cache_pool["$dev"]="$current_pool"
+            else
+                vdevs+=("$dev")
+                vdev_state["$dev"]="$st"
+                vdev_pool["$dev"]="$current_pool"
+            fi
+        fi
+    done < <(zpool status 2>/dev/null || true)
+
+    declare -A mount_dev mount_use
+    while read -r fs size used avail pct mount; do
+        dev="${fs#/dev/}"
+        mount_dev["$dev"]="$mount"
+        mount_use["$dev"]="$pct"
+    done < <(df -h 2>/dev/null | grep '^/dev/')
+
+    mid() {
+        echo "$1" | tr -c '[:alnum:]_' '_' | sed 's/^[0-9]/_/'
+    }
+
+    echo "graph TD"
+    echo "    subgraph Physical[\"Physical Drives\"]"
+    for disk in "${disks[@]}"; do
+        did="disk_$(mid "$disk")"
+        echo "        subgraph ${did}[\"${disk} ${disk_model[$disk]} ${disk_size[$disk]}\"]"
+        echo "            direction TB"
+        for part in "${parts[@]}"; do
+            [[ "${part_parent[$part]}" != "$disk" ]] && continue
+            pid="part_$(mid "$part")"
+            label="${part} ${part_size[$part]}"
+            [[ -n "${part_partlabel[$part]}" ]] && label="${label}\\n${part_partlabel[$part]}"
+            [[ -n "${part_fstype[$part]}" ]] && label="${label}\\n${part_fstype[$part]}"
+            if is_stale_label "$disk" "${part_partlabel[$part]}"; then
+                label="${label} STALE"
+            fi
+            echo "            ${pid}[\"${label}\"]"
+        done
+        echo "        end"
+    done
+    echo "    end"
+    echo
+
+    if [[ "${#pools[@]}" -gt 0 ]]; then
+        echo "    subgraph ZFS[\"ZFS Topology\"]"
+        for pool in "${pools[@]}"; do
+            pid="pool_$(mid "$pool")"
+            echo "        ${pid}[\"pool ${pool} ${pool_health[$pool]}\"]"
+        done
+        for dev in "${vdevs[@]}"; do
+            vid="vdev_$(mid "$dev")"
+            echo "        ${vid}[\"vdev ${dev} ${vdev_state[$dev]}\"]"
+            echo "        pool_$(mid "${vdev_pool[$dev]}") --> ${vid}"
+        done
+        for dev in "${caches[@]}"; do
+            cid="cache_$(mid "$dev")"
+            echo "        ${cid}[\"cache ${dev} ${cache_state[$dev]}\"]"
+            echo "        pool_$(mid "${cache_pool[$dev]}") -.-> ${cid}"
+        done
+        echo "    end"
+        echo
+    fi
+
+    if [[ "${#mount_dev[@]}" -gt 0 ]]; then
+        echo "    subgraph Mounts[\"Active Mounts\"]"
+        for dev in "${!mount_dev[@]}"; do
+            midv="mnt_$(mid "$dev")"
+            echo "        ${midv}[\"${mount_dev[$dev]} ${mount_use[$dev]}\"]"
+            echo "        part_$(mid "$dev") --> ${midv}"
+        done
+        echo "    end"
+    fi
+
+    echo
+    for part in "${parts[@]}"; do
+        pid="part_$(mid "$part")"
+        if is_stale_label "${part_parent[$part]}" "${part_partlabel[$part]}"; then
+            echo "    style ${pid} fill:#e63946,stroke:#c1121f,color:#ffffff"
+        elif [[ "${part_fstype[$part]}" == "zfs_member" ]]; then
+            echo "    style ${pid} fill:#2d6a4f,stroke:#40916c,color:#ffffff"
+        elif [[ "${part_partlabel[$part]}" =~ -ai-hot$ || "${part_label[$part]}" == "ai-hot-tier" ]]; then
+            echo "    style ${pid} fill:#4895ef,stroke:#3a7bd5,color:#ffffff"
+        fi
+    done
 }
 
 run_local() {
-    run_inventory
+    if [[ "$FORMAT" == "mermaid" ]]; then
+        echo '```mermaid'
+        generate_mermaid
+        echo '```'
+    else
+        run_inventory
+    fi
 }
 
 run_remote() {
     if [[ -z "${N5_HOST}" ]]; then
         echo "Error: N5_HOST environment variable is not set" >&2
-        echo "Usage: N5_HOST=<ip> N5_USER=<user> [N5_SSH_KEY=<path>] example-helpers.storage-inventory --remote" >&2
+        echo "Usage: N5_HOST=<ip> N5_USER=<user> [N5_SSH_KEY=<path>] example-helpers.storage-inventory --remote [--mermaid]" >&2
         exit 1
     fi
 
-    echo "Running storage inventory on ${N5_USER}@${N5_HOST}"
-    echo ""
-
-    # Use SSH key if provided, otherwise use default SSH authentication
-    SSH_OPTS="-o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new"
-    if [[ -n "${N5_SSH_KEY}" ]]; then
-        SSH_OPTS="${SSH_OPTS} -i ${N5_SSH_KEY}"
+    if [[ -n "${N5_SSH_KEY}" && ! -f "${N5_SSH_KEY}" ]]; then
+        echo "Error: SSH key not found: ${N5_SSH_KEY}" >&2
+        exit 1
     fi
 
-    ssh ${SSH_OPTS} "${N5_USER}@${N5_HOST}" \
-        "$(declare -f print_section print_subsection run_inventory); run_inventory"
+    fn="run_inventory"
+    [[ "$FORMAT" == "mermaid" ]] && fn="generate_mermaid"
+
+    if [[ "$FORMAT" == "mermaid" ]]; then
+        echo "Generating mermaid diagram from ${N5_USER}@${N5_HOST}"
+        echo '```mermaid'
+    else
+        echo "Running storage inventory on ${N5_USER}@${N5_HOST}"
+        echo
+    fi
+
+    ssh_opts=(
+        -o BatchMode=yes
+        -o ConnectTimeout=10
+        -o StrictHostKeyChecking=accept-new
+    )
+
+    if [[ -n "${N5_SSH_KEY}" ]]; then
+        ssh_opts+=( -i "${N5_SSH_KEY}" )
+    fi
+
+    ssh "${ssh_opts[@]}" \
+            "${N5_USER}@${N5_HOST}" \
+            "$(declare -f init_colors section warn table is_stale_label run_inventory generate_mermaid); ${fn}"
+
+    if [[ "$FORMAT" == "mermaid" ]]; then
+        echo '```'
+    fi
 }
 
 if [[ "${MODE}" == "local" ]]; then
