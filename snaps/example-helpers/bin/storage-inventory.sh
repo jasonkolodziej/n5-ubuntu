@@ -314,12 +314,12 @@ generate_mermaid() {
             [[ "${part_parent[$part]}" != "$disk" ]] && continue
             pid="part_$(mid "$part")"
             label="${part} ${part_size[$part]}"
-            [[ -n "${part_partlabel[$part]}" ]] && label="${label}\\n${part_partlabel[$part]}"
-            [[ -n "${part_fstype[$part]}" ]] && label="${label}\\n${part_fstype[$part]}"
+            [[ -n "${part_partlabel[$part]}" ]] && label+=$'\n'"${part_partlabel[$part]}"
+            [[ -n "${part_fstype[$part]}" ]] && label+=$'\n'"${part_fstype[$part]}"
             if is_stale_label "$disk" "${part_partlabel[$part]}"; then
                 label="${label} STALE"
             fi
-            echo "            ${pid}[\"${label}\"]"
+            echo "            ${pid}[\"\`${label}\`\"]"
         done
         echo "        end"
     done
@@ -330,16 +330,16 @@ generate_mermaid() {
         echo "    subgraph ZFS[\"ZFS Topology\"]"
         for pool in "${pools[@]}"; do
             pid="pool_$(mid "$pool")"
-            echo "        ${pid}[\"pool ${pool} ${pool_health[$pool]}\"]"
+            echo "        ${pid}[\"\`pool ${pool} ${pool_health[$pool]}\`\"]"
         done
         for dev in "${vdevs[@]}"; do
             vid="vdev_$(mid "$dev")"
-            echo "        ${vid}[\"vdev ${dev} ${vdev_state[$dev]}\"]"
+            echo "        ${vid}[\"\`vdev ${dev} ${vdev_state[$dev]}\`\"]"
             echo "        pool_$(mid "${vdev_pool[$dev]}") --> ${vid}"
         done
         for dev in "${caches[@]}"; do
             cid="cache_$(mid "$dev")"
-            echo "        ${cid}[\"cache ${dev} ${cache_state[$dev]}\"]"
+            echo "        ${cid}[\"\`cache ${dev} ${cache_state[$dev]}\`\"]"
             echo "        pool_$(mid "${cache_pool[$dev]}") -.-> ${cid}"
         done
         echo "    end"
@@ -350,7 +350,7 @@ generate_mermaid() {
         echo "    subgraph Mounts[\"Active Mounts\"]"
         for dev in "${!mount_dev[@]}"; do
             midv="mnt_$(mid "$dev")"
-            echo "        ${midv}[\"${mount_dev[$dev]} ${mount_use[$dev]}\"]"
+            echo "        ${midv}[\"\`${mount_dev[$dev]} ${mount_use[$dev]}\`\"]"
             echo "        part_$(mid "$dev") --> ${midv}"
         done
         echo "    end"

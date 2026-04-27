@@ -29,6 +29,22 @@ parts:
     plugin: nil
     stage-packages:
       - zfsutils-linux
+    stage:
+      - usr/sbin/zpool
+      - usr/sbin/zfs
+      - usr/bin/zpool_id
+      - usr/bin/zvol_id
+      - usr/lib/*/libzfs.so*
+      - usr/lib/*/libzpool.so*
+      - usr/lib/*/libnvpair.so*
+      - usr/lib/*/libuutil.so*
+    prime:
+      - usr/sbin/zpool
+      - usr/sbin/zfs
+      - usr/lib/*/libzfs.so*
+      - usr/lib/*/libzpool.so*
+      - usr/lib/*/libnvpair.so*
+      - usr/lib/*/libuutil.so*
 
 apps:
   zpool:

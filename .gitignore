@@ -3,3 +3,4 @@
 **-gnupg*
 **/snapcraft*-credentials**
 node_modules/
+**/.state.n5/
