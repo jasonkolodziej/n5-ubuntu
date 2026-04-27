@@ -16,8 +16,6 @@ website: https://github.com/jasonkolodziej/n5-ubuntu
 base: core24
 confinement: devmode
 grade: devel
-environment:
-  TAR_OPTIONS: '--no-xattrs'
 
 parts:
   scripts:
@@ -29,30 +27,31 @@ parts:
 
   zfs-userspace:
     plugin: nil
-    stage-packages:
-      - zfsutils-linux
+    override-pull: |
+      set -e
+      export DEBIAN_FRONTEND=noninteractive
+      mkdir -p "$SNAPCRAFT_PART_INSTALL/usr/sbin"
+      mkdir -p "$SNAPCRAFT_PART_INSTALL/usr/lib/x86_64-linux-gnu"
+      
+      # Download ZFS packages and extract binaries directly with --no-xattrs to avoid extended attribute errors
+      for pkg in zfsutils-linux libzfs4linux libzpool5linux libnvpair3linux libuutil3linux; do
+        echo "Downloading $pkg..."
+        apt-get download "$pkg" 2>/dev/null || echo "Failed to download $pkg, skipping"
+        for deb in ${pkg}*.deb; do
+          if [ -f "$deb" ]; then
+            echo "Extracting $deb with --no-xattrs..."
+            tar --no-xattrs -xf "$deb" -C "$SNAPCRAFT_PART_INSTALL" 2>/dev/null || true
+            rm -f "$deb"
+          fi
+        done
+      done
+      
+      # Remove system files that cause issues
+      rm -rf "$SNAPCRAFT_PART_INSTALL/etc" || true
+      rm -rf "$SNAPCRAFT_PART_INSTALL/usr/share" || true
     override-build: |
-      # Remove system files with extended attributes that fail on GitHub Actions runners
-      rm -rf "$SNAPCRAFT_PART_INSTALL/etc"
-      rm -rf "$SNAPCRAFT_PART_INSTALL/usr/share/doc"
-      rm -rf "$SNAPCRAFT_PART_INSTALL/usr/share/man"
-      rm -rf "$SNAPCRAFT_PART_INSTALL/usr/share/info"
-    stage:
-      - usr/sbin/zpool
-      - usr/sbin/zfs
-      - usr/bin/zpool_id
-      - usr/bin/zvol_id
-      - usr/lib/*/libzfs.so*
-      - usr/lib/*/libzpool.so*
-      - usr/lib/*/libnvpair.so*
-      - usr/lib/*/libuutil.so*
-    prime:
-      - usr/sbin/zpool
-      - usr/sbin/zfs
-      - usr/lib/*/libzfs.so*
-      - usr/lib/*/libzpool.so*
-      - usr/lib/*/libnvpair.so*
-      - usr/lib/*/libuutil.so*
+      # Build phase is a no-op; all work done in pull
+      true
 
 apps:
   zpool:
