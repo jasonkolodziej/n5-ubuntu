@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# Hook that runs when the snap is first installed
+# This runs during image build, before first boot
+
+echo "example-helpers: Install hook running..."
+echo "example-helpers: Helper snap installed successfully"
+
+# You can add initialization logic here:
+# - Check for required dependencies
+# - Set up directories
+# - Validate system state
+# etc.

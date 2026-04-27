@@ -20,7 +20,40 @@ on:
           - signed
 
 jobs:
+  build-snaps:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install snapcraft
+        run: |
+          sudo snap install snapcraft --classic
+
+      - name: Build example-helpers snap
+        run: |
+          if [ -d "snaps/example-helpers" ]; then
+            cd snaps/example-helpers
+            snapcraft pack --verbose
+            cd ../..
+            mkdir -p built-snaps
+            mv snaps/example-helpers/*.snap built-snaps/ || true
+          else
+            echo "example-helpers source not found, skipping"
+          fi
+
+      - name: Upload built snaps
+        uses: actions/upload-artifact@v4
+        with:
+          name: built-snaps
+          path: built-snaps/*.snap
+          retention-days: 1
+        if: hashFiles('built-snaps/*.snap') != ''
+
   build:
+    needs: build-snaps
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -35,6 +68,13 @@ jobs:
       - name: Install ubuntu-image
         run: |
           sudo snap install ubuntu-image --classic
+
+      - name: Download built snaps
+        uses: actions/download-artifact@v4
+        with:
+          name: built-snaps
+          path: snaps
+        continue-on-error: true
 
       - name: Import signing key
         env:

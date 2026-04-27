@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# Hook that runs when the snap is configured
+# This can be triggered during install, first boot, or with "snap set"
+
+echo "example-helpers: Configure hook running..."
+
+# You can add configuration logic here:
+# - Apply settings from snap configuration
+# - Update system state based on snap configuration
+# - Validate settings
+# etc.
+
+# Example: if the snap had configuration options
+# CUSTOM_SETTING=$(snapctl get custom-option)
+# if [ -n "$CUSTOM_SETTING" ]; then
+#   echo "Using custom setting: $CUSTOM_SETTING"
+# fi

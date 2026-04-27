@@ -1,0 +1,53 @@
+name: example-helpers
+version: '1.0'
+summary: Example helper scripts for Ubuntu Core 24 on N5 Pro
+description: |
+  This snap provides example helper scripts for common system administration
+  tasks on Ubuntu Core 24. Customize for your needs by modifying the scripts
+  and rebuilding.
+
+base: core24
+confinement: strict
+
+parts:
+  scripts:
+    plugin: dump
+    source: .
+    organize:
+      bin/* : bin/
+      hooks/* : hooks/
+
+apps:
+  setup-storage:
+    command: bin/setup-storage.sh
+    plugs:
+      - system-observe
+      - hardware-observe
+
+  configure-network:
+    command: bin/configure-network.sh
+    plugs:
+      - network
+      - network-observe
+
+  networking-state:
+    command: bin/networking-state.sh
+    plugs:
+      - network-observe
+      - system-observe
+      - home
+
+  storage-inventory:
+    command: bin/storage-inventory.sh
+    plugs:
+      - hardware-observe
+      - system-observe
+      - home
+
+hooks:
+  install:
+    plugs:
+      - system-observe
+  configure:
+    plugs:
+      - system-observe

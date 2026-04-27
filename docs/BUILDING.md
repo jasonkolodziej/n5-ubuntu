@@ -152,6 +152,79 @@ cp my-app.snap snaps/
 ubuntu-image snap model-assertion/n5pro.model --validation=enforce --output-dir build --snap snaps/my-app.snap
 ```
 
+### Creating Helper Snaps With Shell Scripts
+
+Ubuntu Core's read-only root filesystem requires that shell scripts and utilities be packaged as snaps. Use the example template in `snaps/example-helpers/` as a starting point:
+
+**Quick start:**
+
+```bash
+cd snaps/example-helpers
+# Customize the scripts in bin/
+# Edit snap/snapcraft.yaml to add your apps
+# Build the snap
+snapcraft pack --verbose
+
+# Move to snaps/ for automatic inclusion
+mv example-helpers_1.0_amd64.snap ../
+
+# Rebuild the image
+cd ../..
+ubuntu-image snap model-assertion/n5pro-model.json --validation=enforce --output-dir build
+```
+
+**Creating your own snap from scratch:**
+
+```bash
+# 1. Create snap structure
+mkdir -p my-helpers/snap my-helpers/bin my-helpers/hooks
+cd my-helpers
+
+# 2. Create snapcraft.yaml
+cat > snap/snapcraft.yaml << 'EOF'
+name: my-helpers
+version: '1.0'
+base: core24
+confinement: strict
+
+parts:
+  scripts:
+    plugin: dump
+    source: .
+    organize:
+      bin/* : bin/
+
+apps:
+  my-script:
+    command: bin/my-script.sh
+    plugs: [system-observe]
+EOF
+
+# 3. Add scripts to bin/
+chmod +x bin/*.sh
+
+# 4. Build
+snapcraft pack --verbose
+
+# 5. Place in snaps/
+mv my-helpers_1.0_amd64.snap ../
+```
+
+**On the running system, helpers are accessed as:**
+
+```bash
+# Via snap command alias
+my-helpers.my-script [arguments]
+
+# Via direct path
+/snap/my-helpers/current/bin/my-script.sh [arguments]
+
+# With SSH access
+ssh user@n5-ip my-helpers.my-script
+```
+
+See [snaps/example-helpers/README.md](../snaps/example-helpers/README.md) for complete templates, hook examples, and confinement guidance.
+
 ### Custom Gadget
 
 For custom boot configuration, kernel parameters, or GRUB changes:
