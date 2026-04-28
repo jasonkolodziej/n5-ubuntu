@@ -102,8 +102,13 @@ Out of scope:
 
 ## Validation
 
-- `pnpm exec biome check .` passes (biome.json covers root JSON/config files).
-- Workflow diff review: confirm `sed` substitutions cover all four `__PLACEHOLDER__` tokens.
+- `jq empty model-assertion/n5pro-model.json` passes after the placeholder change to confirm
+  the tracked model JSON remains syntactically valid.
+- Workflow diff review: confirm the `Sign model assertion` step derives `STORAGE_SAFETY`
+  from `grade`, still replaces all `__PLACEHOLDER__` tokens, and keeps the documented
+  signing flow consistent with the local bootstrap/docs.
+- Docs review: confirm `snaps/README.md` describes `lxd` as side-loaded or post-boot
+  installed rather than required in the model.
 - Smoke test: trigger `workflow_dispatch` with `grade: dangerous` and verify signed model
   assertion contains `storage-safety: prefer-unencrypted` and no `lxd` snap entry.
 - Smoke test: trigger with `grade: signed` and verify `storage-safety: prefer-encrypted`.
