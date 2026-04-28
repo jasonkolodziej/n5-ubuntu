@@ -44,7 +44,7 @@
             "id": "ASctKBEHzVt3f1pbZLoekCvcigRjtuqw"
         },
         {
-            "name": "lxc",
+            "name": "lxd",
             "type": "app",
             "default-channel": "latest/stable",
             "id": "J60k4JY0HppjwOLyQApa5mc8RV7ZN5MS"
