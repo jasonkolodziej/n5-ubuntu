@@ -201,24 +201,10 @@ jobs:
           echo "Running: $cmd"
           eval $cmd
 
-      - name: Fix GPT and compress image artifact
+      - name: Compress image artifact
         run: |
-          sudo apt-get install -y gdisk
           cd build
           ls -lh *.img
-          # Expand image to 8GB so the backup GPT header lands at the correct
-          # location when dd'd to a standard 8GB USB drive.  Without this, Linux
-          # only sees 2 of the 5 Ubuntu Core partitions and snap-bootstrap aborts.
-          for img in *.img; do
-            echo "Expanding $img to 8GB for USB compatibility"
-            truncate -s 8G "$img"
-            sgdisk -e "$img"
-            echo "Partition table after GPT repair:"
-            sgdisk -p "$img"
-          done
-          ls -lh *.img
-          # xz handles the zero-filled region efficiently; download size is
-          # not significantly larger than before this change.
           xz -T0 -v *.img || true
 
       - name: Upload image artifact
