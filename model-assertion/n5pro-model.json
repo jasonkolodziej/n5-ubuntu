@@ -8,7 +8,7 @@
     "timestamp": "__TIMESTAMP__",
     "base": "core24",
     "grade": "__GRADE__",
-    "storage-safety": "prefer-encrypted",
+    "storage-safety": "__STORAGE_SAFETY__",
     "system-user-authority": [
         "__DEVELOPER_ID__"
     ],
