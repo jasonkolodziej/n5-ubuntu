@@ -33,44 +33,25 @@ parts:
       - libnvpair3linux
       - libuutil3linux
     override-build: |
-      # Manually extract zfsutils-linux binaries to avoid xattr errors
-      mkdir -p "$SNAPCRAFT_PART_INSTALL/usr/sbin"
-      cd /tmp
+      # Install zfsutils-linux binaries directly via apt
+      export DEBIAN_FRONTEND=noninteractive
       apt-get update >/dev/null 2>&1 || true
-      apt-get download zfsutils-linux >/dev/null 2>&1 && {
-        deb=$(ls zfsutils-linux*.deb 2>/dev/null | head -1)
-        if [ -n "$deb" ] && [ -f "$deb" ]; then
-          echo "DEBUG: Extracting $deb using dpkg-deb"
-          # Extract .deb using dpkg-deb - show errors if any
-          dpkg-deb -x "$deb" "$SNAPCRAFT_PART_INSTALL" || {
-            echo "DEBUG: dpkg-deb failed, trying ar + tar"
-            # Fallback: manually extract ar members
-            mkdir -p extract_tmp
-            cd extract_tmp
-            ar x "../$deb"
-            # Find data tar and extract
-            data_tar=$(ls data.tar* 2>/dev/null | head -1)
-            if [ -n "$data_tar" ]; then
-              if [[ "$data_tar" == *.gz ]]; then
-                tar -xzf "$data_tar" -C "$SNAPCRAFT_PART_INSTALL"
-              elif [[ "$data_tar" == *.xz ]]; then
-                tar -xJf "$data_tar" -C "$SNAPCRAFT_PART_INSTALL"
-              else
-                tar -xf "$data_tar" -C "$SNAPCRAFT_PART_INSTALL"
-              fi
-            fi
-            cd ..
-            rm -rf extract_tmp
-          }
-          echo "DEBUG: Contents of install/usr/sbin:"
-          ls -la "$SNAPCRAFT_PART_INSTALL/usr/sbin/" 2>/dev/null || echo "DEBUG: /usr/sbin not found"
-          rm -f "$deb"
-        fi
-      } || true
+      apt-get install -y zfsutils-linux >/dev/null 2>&1 || {
+        echo "Error: Failed to install zfsutils-linux"
+        exit 1
+      }
       
-      # Clean up system files not needed in snap
-      rm -rf "$SNAPCRAFT_PART_INSTALL/etc" || true
-      rm -rf "$SNAPCRAFT_PART_INSTALL/usr/share" || true
+      # Copy binaries to install directory
+      mkdir -p "$SNAPCRAFT_PART_INSTALL/usr/sbin"
+      cp /usr/sbin/zpool "$SNAPCRAFT_PART_INSTALL/usr/sbin/" || true
+      cp /usr/sbin/zfs "$SNAPCRAFT_PART_INSTALL/usr/sbin/" || true
+      
+      # Copy libraries
+      mkdir -p "$SNAPCRAFT_PART_INSTALL/usr/lib/x86_64-linux-gnu"
+      cp /usr/lib/x86_64-linux-gnu/libzfs*.so* "$SNAPCRAFT_PART_INSTALL/usr/lib/x86_64-linux-gnu/" 2>/dev/null || true
+      cp /usr/lib/x86_64-linux-gnu/libzpool*.so* "$SNAPCRAFT_PART_INSTALL/usr/lib/x86_64-linux-gnu/" 2>/dev/null || true
+      cp /usr/lib/x86_64-linux-gnu/libnvpair*.so* "$SNAPCRAFT_PART_INSTALL/usr/lib/x86_64-linux-gnu/" 2>/dev/null || true
+      cp /usr/lib/x86_64-linux-gnu/libuutil*.so* "$SNAPCRAFT_PART_INSTALL/usr/lib/x86_64-linux-gnu/" 2>/dev/null || true
     stage:
       - usr/sbin/zpool
       - usr/sbin/zfs
