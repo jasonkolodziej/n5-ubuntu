@@ -86,7 +86,6 @@ parts:
     prime:
       - usr/sbin/zpool
       - usr/sbin/zfs
-      - usr/bin/zfs
       - usr/lib/x86_64-linux-gnu/libzfs.so*
       - usr/lib/x86_64-linux-gnu/libzpool.so*
       - usr/lib/x86_64-linux-gnu/libnvpair.so*
