@@ -33,16 +33,37 @@ parts:
       - libnvpair3linux
       - libuutil3linux
     override-build: |
-      # Manually extract zfsutils-linux binaries with --no-xattrs to avoid GitHub Actions xattr errors
+      # Manually extract zfsutils-linux binaries to avoid xattr errors
       mkdir -p "$SNAPCRAFT_PART_INSTALL/usr/sbin"
       cd /tmp
       apt-get update >/dev/null 2>&1 || true
       apt-get download zfsutils-linux >/dev/null 2>&1 && {
         deb=$(ls zfsutils-linux*.deb 2>/dev/null | head -1)
         if [ -n "$deb" ] && [ -f "$deb" ]; then
-          # Extract .deb (which is an ar archive) using dpkg-deb
-          # This properly extracts without attempting to write extended attributes
-          dpkg-deb -x "$deb" "$SNAPCRAFT_PART_INSTALL" 2>/dev/null || true
+          echo "DEBUG: Extracting $deb using dpkg-deb"
+          # Extract .deb using dpkg-deb - show errors if any
+          dpkg-deb -x "$deb" "$SNAPCRAFT_PART_INSTALL" || {
+            echo "DEBUG: dpkg-deb failed, trying ar + tar"
+            # Fallback: manually extract ar members
+            mkdir -p extract_tmp
+            cd extract_tmp
+            ar x "../$deb"
+            # Find data tar and extract
+            data_tar=$(ls data.tar* 2>/dev/null | head -1)
+            if [ -n "$data_tar" ]; then
+              if [[ "$data_tar" == *.gz ]]; then
+                tar -xzf "$data_tar" -C "$SNAPCRAFT_PART_INSTALL"
+              elif [[ "$data_tar" == *.xz ]]; then
+                tar -xJf "$data_tar" -C "$SNAPCRAFT_PART_INSTALL"
+              else
+                tar -xf "$data_tar" -C "$SNAPCRAFT_PART_INSTALL"
+              fi
+            fi
+            cd ..
+            rm -rf extract_tmp
+          }
+          echo "DEBUG: Contents of install/usr/sbin:"
+          ls -la "$SNAPCRAFT_PART_INSTALL/usr/sbin/" 2>/dev/null || echo "DEBUG: /usr/sbin not found"
           rm -f "$deb"
         fi
       } || true
