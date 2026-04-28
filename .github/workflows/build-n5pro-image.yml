@@ -11,13 +11,14 @@ on:
   workflow_dispatch:
     inputs:
       grade:
-        description: 'Image grade (dangerous/signed)'
+        description: 'Model assertion grade (dangerous/signed/secured)'
         required: true
         default: 'dangerous'
         type: choice
         options:
           - dangerous
           - signed
+          - secured
 
 jobs:
   build-snaps:

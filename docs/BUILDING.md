@@ -129,15 +129,16 @@ If you lack a Linux host or prefer CI/CD:
 
 ## Image Grades
 
-The build supports two grades:
+Per Ubuntu Core model assertion rules, the build supports three grades:
 
-- **dangerous**: Unsigned image, faster to build locally, suitable for development.
-- **signed**: Fully signed for production use. Requires valid signing keys and will fail if keys are missing.
+- **dangerous**: Relaxes model constraints and is intended for development/testing.
+- **signed**: Default production grade; requires asserted snaps matching the model.
+- **secured**: Same as `signed` plus mandatory full-disk encryption and secure boot requirements.
 
 To specify the grade in local builds, edit the `sed` command above:
 
 ```bash
-sed -i "s|__GRADE__|dangerous|g" n5pro-model.json  # or "signed"
+sed -i "s|__GRADE__|dangerous|g" n5pro-model.json  # or "signed" / "secured"
 ```
 
 ## Customizing The Image
