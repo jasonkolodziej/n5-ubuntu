@@ -44,13 +44,8 @@ parts:
 
   zfs-userspace:
     plugin: nil
-    stage-packages:
-      - zfsutils-linux
-      - libzfs4linux
-      - libzpool5linux
-      - libnvpair3linux
-      - libuutil3linux
-    # GitHub Actions overlayfs doesn't support xattr; strip them during extraction
+    # Don't declare stage-packages here—we extract manually in override-pull
+    # to avoid snapcraft's xattr handling on GitHub Actions overlayfs
     override-pull: |
       # Download .debs manually and extract without xattrs
       mkdir -p "$SNAPCRAFT_PART_SRC/debs"
@@ -68,7 +63,9 @@ parts:
           # Find and extract data tar without xattr flags
           data_tar=$(ls data.tar* 2>/dev/null | head -1)
           if [ -n "$data_tar" ]; then
-            if [[ "$data_tar" == *.gz ]]; then
+            if [[ "$data_tar" == *.zst ]]; then
+              tar --no-xattrs -xf "$data_tar"
+            elif [[ "$data_tar" == *.gz ]]; then
               tar --no-xattrs -xzf "$data_tar"
             elif [[ "$data_tar" == *.xz ]]; then
               tar --no-xattrs -xJf "$data_tar"
