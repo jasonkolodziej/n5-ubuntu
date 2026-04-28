@@ -196,19 +196,9 @@ jobs:
       - name: Build Ubuntu Core image
         run: |
           cd model-assertion
-          
-          # Build command - add any custom snaps from ../snaps/
-          cmd="ubuntu-image snap n5pro.model --validation=enforce --output-dir ../build"
-          
-          # Add any local snaps if they exist
-          for snap in ../snaps/*.snap; do
-            if [ -f "$snap" ]; then
-              cmd="$cmd --snap $snap"
-            fi
-          done
-          
-          echo "Running: $cmd"
-          eval $cmd
+
+          # Build only from the signed model assertion.
+          ubuntu-image snap n5pro.model --validation=enforce --output-dir ../build
 
       - name: Compress image artifact
         run: |
@@ -254,7 +244,6 @@ jobs:
             - core24
             - snapd
             - console-conf (for initial setup)
-            - Any locally built snap artifacts from `snaps/*` source directories
             
             ## Usage
             1. Download the `.img.xz` artifact
