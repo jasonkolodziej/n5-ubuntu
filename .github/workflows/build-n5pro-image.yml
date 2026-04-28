@@ -99,7 +99,7 @@ jobs:
           sudo snap install ubuntu-image --classic
 
       - name: Download built snaps
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           pattern: built-snaps-*
           merge-multiple: true
@@ -222,7 +222,7 @@ jobs:
       contents: write
     steps:
       - name: Download image artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           name: ubuntu-core-24-n5pro-${{ github.run_number }}
           path: build
@@ -232,6 +232,7 @@ jobs:
         with:
           tag_name: v${{ github.run_number }}
           name: "N5 Pro Ubuntu Core 24 Build #${{ github.run_number }}"
+          prerelease: ${{ (github.event.inputs.grade || 'dangerous') != 'signed' }}
           body: |
             Custom Ubuntu Core 24 image for Minisforum N5 Pro
             
