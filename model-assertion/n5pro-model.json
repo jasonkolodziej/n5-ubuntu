@@ -8,7 +8,7 @@
     "timestamp": "__TIMESTAMP__",
     "base": "core24",
     "grade": "__GRADE__",
-    "storage-safety": "prefer-encrypted",
+    "storage-safety": "__STORAGE_SAFETY__",
     "system-user-authority": [
         "__DEVELOPER_ID__"
     ],
@@ -42,12 +42,6 @@
             "type": "app",
             "default-channel": "24/stable",
             "id": "ASctKBEHzVt3f1pbZLoekCvcigRjtuqw"
-        },
-        {
-            "name": "lxd",
-            "type": "app",
-            "default-channel": "latest/stable",
-            "id": "J60k4JY0HppjwOLyQApa5mc8RV7ZN5MS"
         }
     ]
 }

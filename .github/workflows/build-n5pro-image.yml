@@ -173,10 +173,19 @@ jobs:
           GRADE: ${{ github.event.inputs.grade || 'dangerous' }}
         run: |
           cd model-assertion
+
+          # Derive storage-safety from grade
+          case "$GRADE" in
+            secured)  STORAGE_SAFETY="encrypted" ;;
+            signed)   STORAGE_SAFETY="prefer-encrypted" ;;
+            *)        STORAGE_SAFETY="prefer-unencrypted" ;;
+          esac
+
           # Inject secrets into the model template
           sed -i "s|__DEVELOPER_ID__|$DEVELOPER_ID|g" n5pro-model.json
           sed -i "s|__TIMESTAMP__|$(date -Iseconds --utc)|g" n5pro-model.json
           sed -i "s|__GRADE__|$GRADE|g" n5pro-model.json
+          sed -i "s|__STORAGE_SAFETY__|$STORAGE_SAFETY|g" n5pro-model.json
           
           # Sign it
           cat n5pro-model.json | SNAP_GNUPG_HOME="$SNAP_GNUPG_HOME" snap sign -k "$SIGNING_KEY_NAME_RESOLVED" > n5pro.model

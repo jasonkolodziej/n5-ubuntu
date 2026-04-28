@@ -77,9 +77,17 @@ snap keys
 cd model-assertion
 
 # 6) Inject your DEVELOPER_ID and sign the model
+GRADE=dangerous   # change to: signed | secured
+case "$GRADE" in
+  secured)  STORAGE_SAFETY="encrypted" ;;
+  signed)   STORAGE_SAFETY="prefer-encrypted" ;;
+  *)        STORAGE_SAFETY="prefer-unencrypted" ;;
+esac
+
 sed -i "s|__DEVELOPER_ID__|YOUR_DEVELOPER_ID|g" n5pro-model.json
 sed -i "s|__TIMESTAMP__|$(date -Iseconds --utc)|g" n5pro-model.json
-sed -i "s|__GRADE__|dangerous|g" n5pro-model.json
+sed -i "s|__GRADE__|$GRADE|g" n5pro-model.json
+sed -i "s|__STORAGE_SAFETY__|$STORAGE_SAFETY|g" n5pro-model.json
 
 # Sign with your key (use KEY_NAME from .env)
 cat n5pro-model.json | snap sign -k <KEY_NAME> > n5pro.model
@@ -135,11 +143,27 @@ Per Ubuntu Core model assertion rules, the build supports three grades:
 - **signed**: Default production grade; requires asserted snaps matching the model.
 - **secured**: Same as `signed` plus mandatory full-disk encryption and secure boot requirements.
 
-To specify the grade in local builds, edit the `sed` command above:
+To specify the grade in local builds, set `GRADE` in the signing step above:
 
 ```bash
-sed -i "s|__GRADE__|dangerous|g" n5pro-model.json  # or "signed" / "secured"
+GRADE=dangerous   # or: signed | secured
+case "$GRADE" in
+  secured)  STORAGE_SAFETY="encrypted" ;;
+  signed)   STORAGE_SAFETY="prefer-encrypted" ;;
+  *)        STORAGE_SAFETY="prefer-unencrypted" ;;
+esac
+
+sed -i "s|__GRADE__|$GRADE|g" n5pro-model.json
+sed -i "s|__STORAGE_SAFETY__|$STORAGE_SAFETY|g" n5pro-model.json
 ```
+
+The `storage-safety` value is derived automatically from the grade:
+
+| Grade | `storage-safety` | Effect |
+|-------|-----------------|--------|
+| `dangerous` | `prefer-unencrypted` | No FDE enrollment attempt; suitable for development/testing hardware |
+| `signed` | `prefer-encrypted` | TPM2-backed FDE if available; skips gracefully if absent |
+| `secured` | `encrypted` | Mandatory FDE + secure boot; fails if TPM2/secure boot not enrolled |
 
 ## Customizing The Image
 
