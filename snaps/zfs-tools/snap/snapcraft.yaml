@@ -49,6 +49,7 @@ parts:
     override-pull: |
       # Download .debs manually and extract without xattrs
       mkdir -p "$SNAPCRAFT_PART_SRC/debs"
+      mkdir -p "$SNAPCRAFT_PART_SRC/extract-root"
       cd "$SNAPCRAFT_PART_SRC/debs"
 
       apt-get update >/dev/null 2>&1 || true
@@ -64,13 +65,13 @@ parts:
           data_tar=$(ls data.tar* 2>/dev/null | head -1)
           if [ -n "$data_tar" ]; then
             if [[ "$data_tar" == *.zst ]]; then
-              tar --no-xattrs -xf "$data_tar"
+              tar --no-xattrs -xf "$data_tar" -C "$SNAPCRAFT_PART_SRC/extract-root"
             elif [[ "$data_tar" == *.gz ]]; then
-              tar --no-xattrs -xzf "$data_tar"
+              tar --no-xattrs -xzf "$data_tar" -C "$SNAPCRAFT_PART_SRC/extract-root"
             elif [[ "$data_tar" == *.xz ]]; then
-              tar --no-xattrs -xJf "$data_tar"
+              tar --no-xattrs -xJf "$data_tar" -C "$SNAPCRAFT_PART_SRC/extract-root"
             else
-              tar --no-xattrs -xf "$data_tar"
+              tar --no-xattrs -xf "$data_tar" -C "$SNAPCRAFT_PART_SRC/extract-root"
             fi
           fi
           cd ..
@@ -80,8 +81,8 @@ parts:
     override-build: |
       # Move extracted files to install
       mkdir -p "$SNAPCRAFT_PART_INSTALL"
-      [ -d "$SNAPCRAFT_PART_SRC/debs/usr" ] && cp -r "$SNAPCRAFT_PART_SRC/debs/usr" "$SNAPCRAFT_PART_INSTALL/" || true
-      [ -d "$SNAPCRAFT_PART_SRC/debs/etc" ] && cp -r "$SNAPCRAFT_PART_SRC/debs/etc" "$SNAPCRAFT_PART_INSTALL/" || true
+      [ -d "$SNAPCRAFT_PART_SRC/extract-root/usr" ] && cp -r "$SNAPCRAFT_PART_SRC/extract-root/usr" "$SNAPCRAFT_PART_INSTALL/" || true
+      [ -d "$SNAPCRAFT_PART_SRC/extract-root/etc" ] && cp -r "$SNAPCRAFT_PART_SRC/extract-root/etc" "$SNAPCRAFT_PART_INSTALL/" || true
     prime:
       - usr/sbin/zpool
       - usr/sbin/zfs

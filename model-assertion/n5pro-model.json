@@ -9,7 +9,9 @@
     "base": "core24",
     "grade": "__GRADE__",
     "storage-safety": "prefer-encrypted",
-    "system-user-authority": ["__DEVELOPER_ID__"],
+    "system-user-authority": [
+        "__DEVELOPER_ID__"
+    ],
     "snaps": [
         {
             "name": "pc",
