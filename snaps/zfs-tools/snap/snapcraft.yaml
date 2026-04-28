@@ -17,6 +17,23 @@ base: core24
 confinement: devmode
 grade: devel
 
+plugs:
+  mount-control:
+    interface: mount-control
+
+apps:
+  auto-init:
+    command: bin/auto-init.sh
+    plugs:
+      - mount-control
+      - system-observe
+  init-pool:
+    command: bin/init-pool.sh
+    plugs:
+      - mount-control
+  status:
+    command: bin/status.sh
+
 parts:
   scripts:
     plugin: dump
@@ -28,95 +45,51 @@ parts:
   zfs-userspace:
     plugin: nil
     stage-packages:
+      - zfsutils-linux
       - libzfs4linux
       - libzpool5linux
       - libnvpair3linux
       - libuutil3linux
-    override-build: |
-      # Install zfsutils-linux binaries directly via apt
-      export DEBIAN_FRONTEND=noninteractive
+    # GitHub Actions overlayfs doesn't support xattr; strip them during extraction
+    override-pull: |
+      # Download .debs manually and extract without xattrs
+      mkdir -p "$SNAPCRAFT_PART_SRC/debs"
+      cd "$SNAPCRAFT_PART_SRC/debs"
+
       apt-get update >/dev/null 2>&1 || true
-      apt-get install -y zfsutils-linux >/dev/null 2>&1 || {
-        echo "Error: Failed to install zfsutils-linux"
-        exit 1
-      }
-      
-      # Copy binaries to install directory
-      mkdir -p "$SNAPCRAFT_PART_INSTALL/usr/sbin"
-      cp /usr/sbin/zpool "$SNAPCRAFT_PART_INSTALL/usr/sbin/" || true
-      cp /usr/sbin/zfs "$SNAPCRAFT_PART_INSTALL/usr/sbin/" || true
-      
-      # Copy libraries
-      mkdir -p "$SNAPCRAFT_PART_INSTALL/usr/lib/x86_64-linux-gnu"
-      cp /usr/lib/x86_64-linux-gnu/libzfs*.so* "$SNAPCRAFT_PART_INSTALL/usr/lib/x86_64-linux-gnu/" 2>/dev/null || true
-      cp /usr/lib/x86_64-linux-gnu/libzpool*.so* "$SNAPCRAFT_PART_INSTALL/usr/lib/x86_64-linux-gnu/" 2>/dev/null || true
-      cp /usr/lib/x86_64-linux-gnu/libnvpair*.so* "$SNAPCRAFT_PART_INSTALL/usr/lib/x86_64-linux-gnu/" 2>/dev/null || true
-      cp /usr/lib/x86_64-linux-gnu/libuutil*.so* "$SNAPCRAFT_PART_INSTALL/usr/lib/x86_64-linux-gnu/" 2>/dev/null || true
-    stage:
-      - usr/sbin/zpool
-      - usr/sbin/zfs
-      - usr/lib/x86_64-linux-gnu/libzfs.so*
-      - usr/lib/x86_64-linux-gnu/libzpool.so*
-      - usr/lib/x86_64-linux-gnu/libnvpair.so*
-      - usr/lib/x86_64-linux-gnu/libuutil.so*
+      apt-get download zfsutils-linux libzfs4linux libzpool5linux libnvpair3linux libuutil3linux 2>/dev/null || true
+
+      # Extract each .deb without xattrs using tar --no-xattrs
+      for deb in *.deb; do
+        if [ -f "$deb" ]; then
+          mkdir -p work && cd work
+          # ar extracts the .deb members
+          ar x "../$deb" 2>/dev/null || true
+          # Find and extract data tar without xattr flags
+          data_tar=$(ls data.tar* 2>/dev/null | head -1)
+          if [ -n "$data_tar" ]; then
+            if [[ "$data_tar" == *.gz ]]; then
+              tar --no-xattrs -xzf "$data_tar"
+            elif [[ "$data_tar" == *.xz ]]; then
+              tar --no-xattrs -xJf "$data_tar"
+            else
+              tar --no-xattrs -xf "$data_tar"
+            fi
+          fi
+          cd ..
+          rm -rf work
+        fi
+      done
+    override-build: |
+      # Move extracted files to install
+      mkdir -p "$SNAPCRAFT_PART_INSTALL"
+      [ -d "$SNAPCRAFT_PART_SRC/debs/usr" ] && cp -r "$SNAPCRAFT_PART_SRC/debs/usr" "$SNAPCRAFT_PART_INSTALL/" || true
+      [ -d "$SNAPCRAFT_PART_SRC/debs/etc" ] && cp -r "$SNAPCRAFT_PART_SRC/debs/etc" "$SNAPCRAFT_PART_INSTALL/" || true
     prime:
       - usr/sbin/zpool
       - usr/sbin/zfs
+      - usr/bin/zfs
       - usr/lib/x86_64-linux-gnu/libzfs.so*
       - usr/lib/x86_64-linux-gnu/libzpool.so*
       - usr/lib/x86_64-linux-gnu/libnvpair.so*
       - usr/lib/x86_64-linux-gnu/libuutil.so*
-
-apps:
-  zpool:
-    command: usr/sbin/zpool
-    plugs:
-      - block-devices
-      - hardware-observe
-      - mount-observe
-      - system-observe
-
-  zfs:
-    command: usr/sbin/zfs
-    plugs:
-      - block-devices
-      - hardware-observe
-      - mount-observe
-      - system-observe
-
-  status:
-    command: bin/status.sh
-    plugs:
-      - block-devices
-      - hardware-observe
-      - mount-observe
-      - system-observe
-
-  init-pool:
-    command: bin/init-pool.sh
-    plugs:
-      - block-devices
-      - hardware-observe
-      - mount-observe
-      - system-observe
-
-  auto-init:
-    command: bin/auto-init.sh
-    daemon: simple
-    restart-condition: on-failure
-    plugs:
-      - block-devices
-      - hardware-observe
-      - mount-observe
-      - system-observe
-
-hooks:
-  install:
-    plugs:
-      - system-observe
-  configure:
-    plugs:
-      - block-devices
-      - hardware-observe
-      - mount-observe
-      - system-observe
