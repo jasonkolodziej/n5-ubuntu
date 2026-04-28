@@ -82,10 +82,13 @@ parts:
       # Move extracted files to install
       mkdir -p "$SNAPCRAFT_PART_INSTALL"
       [ -d "$SNAPCRAFT_PART_SRC/extract-root/usr" ] && cp -r "$SNAPCRAFT_PART_SRC/extract-root/usr" "$SNAPCRAFT_PART_INSTALL/" || true
+      [ -d "$SNAPCRAFT_PART_SRC/extract-root/sbin" ] && cp -r "$SNAPCRAFT_PART_SRC/extract-root/sbin" "$SNAPCRAFT_PART_INSTALL/" || true
       [ -d "$SNAPCRAFT_PART_SRC/extract-root/etc" ] && cp -r "$SNAPCRAFT_PART_SRC/extract-root/etc" "$SNAPCRAFT_PART_INSTALL/" || true
     prime:
       - usr/sbin/zpool
       - usr/sbin/zfs
+      - sbin/zpool
+      - sbin/zfs
       - usr/lib/x86_64-linux-gnu/libzfs.so*
       - usr/lib/x86_64-linux-gnu/libzpool.so*
       - usr/lib/x86_64-linux-gnu/libnvpair.so*
