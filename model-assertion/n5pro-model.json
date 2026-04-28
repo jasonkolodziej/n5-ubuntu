@@ -40,6 +40,12 @@
             "type": "app",
             "default-channel": "24/stable",
             "id": "ASctKBEHzVt3f1pbZLoekCvcigRjtuqw"
+        },
+        {
+            "name": "lxc",
+            "type": "app",
+            "default-channel": "latest/stable",
+            "id": "J60k4JY0HppjwOLyQApa5mc8RV7ZN5MS"
         }
     ]
 }
