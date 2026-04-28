@@ -74,7 +74,7 @@ jobs:
           fi
 
       - name: Upload built snaps
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: built-snaps-${{ matrix.snap_name }}
           path: built-snaps/*.snap
@@ -208,7 +208,7 @@ jobs:
           xz -T0 -v *.img || true
 
       - name: Upload image artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: ubuntu-core-24-n5pro-${{ github.run_number }}
           path: build/*.img*
