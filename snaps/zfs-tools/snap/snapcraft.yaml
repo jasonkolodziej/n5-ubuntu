@@ -84,6 +84,10 @@ parts:
       [ -d "$SNAPCRAFT_PART_SRC/extract-root/usr" ] && cp -r "$SNAPCRAFT_PART_SRC/extract-root/usr" "$SNAPCRAFT_PART_INSTALL/" || true
       [ -d "$SNAPCRAFT_PART_SRC/extract-root/sbin" ] && cp -r "$SNAPCRAFT_PART_SRC/extract-root/sbin" "$SNAPCRAFT_PART_INSTALL/" || true
       [ -d "$SNAPCRAFT_PART_SRC/extract-root/etc" ] && cp -r "$SNAPCRAFT_PART_SRC/extract-root/etc" "$SNAPCRAFT_PART_INSTALL/" || true
+      # Ensure prime paths exist regardless of package layout.
+      mkdir -p "$SNAPCRAFT_PART_INSTALL/usr/sbin"
+      [ -x "$SNAPCRAFT_PART_INSTALL/sbin/zfs" ] && cp "$SNAPCRAFT_PART_INSTALL/sbin/zfs" "$SNAPCRAFT_PART_INSTALL/usr/sbin/zfs" || true
+      [ -x "$SNAPCRAFT_PART_INSTALL/sbin/zpool" ] && cp "$SNAPCRAFT_PART_INSTALL/sbin/zpool" "$SNAPCRAFT_PART_INSTALL/usr/sbin/zpool" || true
     prime:
       - usr/sbin/zpool
       - usr/sbin/zfs

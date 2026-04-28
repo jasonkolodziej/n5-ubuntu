@@ -21,6 +21,17 @@ on:
 
 jobs:
   build-snaps:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - snap_name: example-helpers
+            snap_dir: snaps/example-helpers
+            optional: false
+          - snap_name: zfs-tools
+            snap_dir: snaps/zfs-tools
+            optional: true
+    continue-on-error: ${{ matrix.optional }}
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -32,46 +43,40 @@ jobs:
         run: |
           sudo snap install snapcraft --classic
 
-      - name: Build example-helpers snap
+      - name: Build snap
         run: |
           mkdir -p built-snaps
+          snap_dir="${{ matrix.snap_dir }}"
+
+          if [ ! -f "$snap_dir/snap/snapcraft.yaml" ]; then
+            echo "error: missing snapcraft.yaml in $snap_dir" >&2
+            exit 1
+          fi
+
+          echo "Building snap source: $snap_dir"
+          [ -d "$snap_dir/bin" ] && chmod +x "$snap_dir"/bin/*.sh || true
+          [ -d "$snap_dir/hooks" ] && chmod +x "$snap_dir"/hooks/* || true
+
+          pushd "$snap_dir" >/dev/null
+          snapcraft pack --destructive-mode --verbose
+          popd >/dev/null
 
           shopt -s nullglob
-          snap_dirs=(snaps/*)
-          built_count=0
-
-          for snap_dir in "${snap_dirs[@]}"; do
-            if [ ! -f "$snap_dir/snap/snapcraft.yaml" ]; then
-              continue
-            fi
-
-            echo "Building snap source: $snap_dir"
-            [ -d "$snap_dir/bin" ] && chmod +x "$snap_dir"/bin/*.sh || true
-            [ -d "$snap_dir/hooks" ] && chmod +x "$snap_dir"/hooks/* || true
-
-            pushd "$snap_dir" >/dev/null
-            snapcraft pack --destructive-mode --verbose
-            popd >/dev/null
-
-            moved=false
-            for snap_file in "$snap_dir"/*.snap; do
-              mv "$snap_file" built-snaps/
-              moved=true
-              built_count=$((built_count + 1))
-            done
-
-            if [ "$moved" = false ]; then
-              echo "error: no .snap artifact produced in $snap_dir" >&2
-              exit 1
-            fi
+          moved=false
+          for snap_file in "$snap_dir"/*.snap; do
+            mv "$snap_file" built-snaps/
+            moved=true
           done
 
-          echo "Built $built_count snap artifact(s)."
+          if [ "$moved" = false ]; then
+            echo "error: no .snap artifact produced in $snap_dir" >&2
+            exit 1
+          fi
 
       - name: Upload built snaps
         uses: actions/upload-artifact@v5
         with:
-          name: built-snaps
+          name: built-snaps-${{ matrix.snap_name }}
           path: built-snaps/*.snap
           retention-days: 1
         if: hashFiles('built-snaps/*.snap') != ''
@@ -96,7 +101,8 @@ jobs:
       - name: Download built snaps
         uses: actions/download-artifact@v5
         with:
-          name: built-snaps
+          pattern: built-snaps-*
+          merge-multiple: true
           path: snaps
         continue-on-error: true
 
