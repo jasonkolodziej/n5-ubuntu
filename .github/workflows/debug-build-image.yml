@@ -1,0 +1,152 @@
+name: Debug Build N5 Pro Ubuntu Core 24 Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      developer_id:
+        description: 'Developer ID (Snap Store authority-id)'
+        required: true
+        default: ''
+        type: string
+      skip_image:
+        description: 'Skip image build and only generate metadata'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  debug-build:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+
+      - name: Install tools
+        run: |
+          sudo snap install ubuntu-image --classic
+
+      - name: Generate model assertion (dangerous grade, no signing)
+        run: |
+          cd model-assertion
+          
+          # Create unsigned model for testing
+          sed "s|__DEVELOPER_ID__|${{ inputs.developer_id }}|g" n5pro-model.json > n5pro-model-filled.json
+          sed -i "s|__TIMESTAMP__|$(date -Iseconds --utc)|g" n5pro-model-filled.json
+          sed -i "s|__GRADE__|dangerous|g" n5pro-model-filled.json
+          sed -i "s|__STORAGE_SAFETY__|prefer-unencrypted|g" n5pro-model-filled.json
+          
+          cat n5pro-model-filled.json
+
+      - name: Capture snap metadata
+        run: |
+          mkdir -p debug-metadata
+          
+          # Snap store queries - show what will be pulled
+          echo "=== snap find (pc gadget) ===" > debug-metadata/snap-queries.txt
+          snap find --narrow pc || true
+          
+          echo "" >> debug-metadata/snap-queries.txt
+          echo "=== snap find (pc-kernel) ===" >> debug-metadata/snap-queries.txt
+          snap find --narrow pc-kernel || true
+          
+          echo "" >> debug-metadata/snap-queries.txt
+          echo "=== snap find (core24) ===" >> debug-metadata/snap-queries.txt
+          snap find --narrow core24 || true
+          
+          echo "" >> debug-metadata/snap-queries.txt
+          echo "=== snap find (snapd) ===" >> debug-metadata/snap-queries.txt
+          snap find --narrow snapd || true
+          
+          # Model assertion content
+          echo "=== Model Assertion (filled template) ===" > debug-metadata/model-assertion.txt
+          cat model-assertion/n5pro-model-filled.json >> debug-metadata/model-assertion.txt
+          
+          # Biome check on model (if applicable)
+          pnpm exec biome check model-assertion/n5pro-model-filled.json 2>&1 || true > debug-metadata/biome-check.txt
+          
+          # List collected metadata
+          echo "=== Debug Metadata Files ===" 
+          ls -lh debug-metadata/
+
+      - name: Build Ubuntu Core image (dangerous grade, unsigned)
+        if: ${{ !inputs.skip_image }}
+        run: |
+          cd model-assertion
+          
+          mkdir -p ../build
+          
+          # Build with unsigned model (dangerous grade)
+          echo "=== Building image with unsigned model (dangerous grade) ==="
+          sudo ubuntu-image snap n5pro-model-filled.json --validation=enforce --output-dir ../build || {
+            echo "Image build failed. Capturing logs..."
+            sudo journalctl -xe --no-pager -n 100 > ../debug-metadata/boot-logs.txt || true
+            ls -lh ../build/
+            exit 1
+          }
+          
+          ls -lh ../build/
+
+      - name: Verify image and capture details
+        if: ${{ !inputs.skip_image && success() }}
+        run: |
+          cd build
+          
+          # Image details
+          echo "=== Image Files ===" > ../debug-metadata/image-details.txt
+          ls -lh *.img* >> ../debug-metadata/image-details.txt
+          
+          echo "" >> ../debug-metadata/image-details.txt
+          echo "=== Image Info ===" >> ../debug-metadata/image-details.txt
+          if command -v fdisk >/dev/null 2>&1; then
+            sudo fdisk -l ubuntu-core-24-*.img | head -50 >> ../debug-metadata/image-details.txt 2>&1 || true
+          fi
+          
+          # GPT table
+          echo "" >> ../debug-metadata/image-details.txt
+          echo "=== GPT Partition Table ===" >> ../debug-metadata/image-details.txt
+          if command -v sgdisk >/dev/null 2>&1; then
+            sudo sgdisk -p ubuntu-core-24-*.img >> ../debug-metadata/image-details.txt 2>&1 || true
+          fi
+          
+          cat ../debug-metadata/image-details.txt
+
+      - name: Compress image (if built)
+        if: ${{ !inputs.skip_image && success() }}
+        run: |
+          cd build
+          ls -lh *.img
+          xz -T0 -v *.img || true
+          ls -lh *.img*
+
+      - name: Upload metadata
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: debug-metadata-${{ github.run_number }}
+          path: debug-metadata/
+          retention-days: 7
+
+      - name: Upload image (if built)
+        if: ${{ !inputs.skip_image && success() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ubuntu-core-24-n5pro-debug-${{ github.run_number }}
+          path: build/*.img*
+          retention-days: 7
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "=== Debug Build Summary ==="
+          echo "Run: ${{ github.run_number }}"
+          echo "Developer ID: ${{ inputs.developer_id }}"
+          echo "Grade: dangerous (unsigned, for testing only)"
+          echo "Skip Image: ${{ inputs.skip_image }}"
+          echo ""
+          echo "Artifacts:"
+          echo "  - debug-metadata-${{ github.run_number }}: metadata, queries, snap details"
+          if [ "${{ inputs.skip_image }}" != "true" ]; then
+            echo "  - ubuntu-core-24-n5pro-debug-${{ github.run_number }}: image + compressed"
+          fi

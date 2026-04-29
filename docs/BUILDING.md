@@ -125,7 +125,42 @@ If you lack a Linux host or prefer CI/CD:
 
 3. **Download the image:**
    - After the build completes, artifacts are uploaded to Actions
-    - For releases, the image is published as a GitHub Release asset. CI builds the image from the signed model assertion only and does not auto-add local `.snap` files from `snaps/`.
+   - For releases, the image is published as a GitHub Release asset. CI builds the image from the signed model assertion only and does not auto-add local `.snap` files from `snaps/`.
+
+## Debug Build Workflow
+
+For faster iteration and troubleshooting, use the **Debug Build** workflow:
+
+1. **Trigger the debug build:**
+   - Go to GitHub Actions → Debug Build N5 Pro Ubuntu Core 24 Image → Run workflow
+   - Provide your `DEVELOPER_ID` (your Snap Store authority ID)
+   - Choose `skip_image: false` to build the full image, or `true` to only generate metadata
+
+2. **What it does:**
+   - Builds with `grade: dangerous` (no signing required, faster feedback)
+   - Does NOT require GPG secrets or signing key setup
+   - Emits metadata artifacts:
+     - `snap-queries.txt`: Snap Store info for gadget, kernel, base, snapd
+     - `model-assertion.txt`: The filled model assertion template
+     - `image-details.txt`: GPT partition table and image layout
+   - Produces a test image (if not skipped)
+
+3. **When to use:**
+   - Iterating on model assertion fields (snaps, storage-safety, etc.)
+   - Verifying GPT partition layout before flashing
+   - Checking that canonical snaps resolve correctly
+   - Testing boot flow without full CI signing overhead
+
+**Example workflow:**
+
+```bash
+# 1. Modify model-assertion/n5pro-model.json (add snaps, change fields)
+# 2. Push to repo or trigger debug build manually
+# 3. Download debug-metadata artifact → review snap-queries.txt, image-details.txt
+# 4. Download image artifact → flash to USB
+# 5. Boot and capture any errors
+# 6. Update model-assertion based on findings and repeat
+```
 
 ## Image Grades
 
