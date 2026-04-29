@@ -23,6 +23,7 @@ Prefer the smallest validation that matches the files you changed.
 - Treat `.ubuntu/.env`, `.ubuntu/data/`, signing keys, exported credentials, and any base64 secret material as sensitive. Never commit them, print them into markdown, or add sample values beyond placeholders already in the repo.
 - Prefer changes that work both for the local `.ubuntu` bootstrap flow and for the GitHub Actions workflow instead of introducing environment-specific divergence.
 - The default image build path assumes the generic `pc` gadget and optional `.snap` files dropped into `snaps/`.
+- For shell snippets and scripts intended to run on macOS, assume the system Bash is 3.2 and avoid Bash 4+ features such as `${var,,}`.
 
 ## Copilot Agents And Plans
 - Shared repo agents live in `.github/agents/` and are expected to delegate based on task shape: local execution, terminal-first CLI help, cloud-safe repo edits, and review.

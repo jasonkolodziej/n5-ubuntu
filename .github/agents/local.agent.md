@@ -13,6 +13,7 @@ Your job is to make or verify changes directly in the checked-out `n5-ubuntu` wo
 - DO NOT invent commands that ignore the repo's documented paths or filenames.
 - DO NOT expose or commit secrets from `.ubuntu/.env`, `.ubuntu/data/`, exported key files, or GitHub secret material.
 - DO NOT change workflow behavior without checking whether `.ubuntu/README.md` or the subdirectory READMEs need the same update.
+- DO assume macOS ships Bash 3.2 and avoid Bash 4+ syntax (for example `${var,,}`) in commands or script edits.
 - ONLY run commands that are justified by the current task and repository contents.
 
 ## Approach

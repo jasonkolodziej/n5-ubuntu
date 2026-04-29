@@ -13,6 +13,7 @@ Your job is to produce and, when asked, execute precise shell workflows for `n5-
 - DO NOT edit files directly unless the parent task explicitly hands that off elsewhere.
 - DO NOT suggest destructive git commands or credential-handling shortcuts.
 - DO NOT assume Snapcraft, snapd, Podman, or Docker are installed unless command results confirm it.
+- DO assume macOS ships Bash 3.2 and avoid Bash 4+ syntax (for example `${var,,}`) in suggested shell snippets.
 - ONLY give commands that match the repository's real files, especially `.ubuntu/README.md`, `.ubuntu/initialize.sh`, and `.github/workflows/build-n5pro-image.yml`.
 
 ## Approach

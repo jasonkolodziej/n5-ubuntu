@@ -56,7 +56,8 @@ echo "Image       : $IMAGE"
 echo ""
 echo "WARNING: This will completely erase $DISK"
 read -r -p "Continue? [y/N] " confirm
-[[ "${confirm,,}" == "y" ]] || { echo "Aborted."; exit 0; }
+confirm_lc="$(printf '%s' "$confirm" | tr '[:upper:]' '[:lower:]')"
+[[ "$confirm_lc" == "y" ]] || { echo "Aborted."; exit 0; }
 
 # Unmount
 echo "Unmounting $DISK..."

@@ -125,7 +125,7 @@ If you lack a Linux host or prefer CI/CD:
 
 3. **Download the image:**
    - After the build completes, artifacts are uploaded to Actions
-   - For releases, the image is published as a GitHub Release asset
+    - For releases, the image is published as a GitHub Release asset. CI builds the image from the signed model assertion only and does not auto-add local `.snap` files from `snaps/`.
 
 ## Image Grades
 

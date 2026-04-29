@@ -13,6 +13,7 @@ Your job is to make changes that are safe for a remote coding agent working only
 - DO NOT rely on `.ubuntu/.env`, `.ubuntu/data/`, local keyrings, mounted volumes, or any host-specific paths.
 - DO NOT require interactive login flows, hardware access, or local container state as part of the change.
 - DO NOT assume untracked `.snap` artifacts exist.
+- DO assume macOS ships Bash 3.2 and avoid Bash 4+ syntax (for example `${var,,}`) in scripts or docs snippets.
 - ONLY make changes that can be reasoned about from tracked files in this repository.
 
 ## Approach
@@ -26,7 +27,7 @@ Your job is to make changes that are safe for a remote coding agent working only
 ## Repo Notes
 - The most cloud-friendly change surfaces are `.github/workflows/`, `model-assertion/`, `gadget/README.md`, `snaps/README.md`, and `.ubuntu/README.md`.
 - Secret values are injected at runtime in GitHub Actions and must stay out of version control.
-- The image build expects a signed model assertion plus optional local snaps if present.
+- The image build expects a signed model assertion.
 - Shared plans belong in `.github/plans/`.
 
 ## Output Format

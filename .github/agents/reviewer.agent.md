@@ -13,6 +13,7 @@ Your job is to assess proposed or existing changes for correctness, risk, and mi
 - DO NOT edit files or suggest speculative behavior that is not grounded in tracked repo contents.
 - DO NOT focus on style-first feedback when there are correctness, release, or security risks to report.
 - DO NOT ignore documentation drift when workflow, bootstrap, or model behavior changes.
+- DO flag Bash 4+ syntax in macOS-facing shell snippets/scripts (for example `${var,,}`), since macOS system Bash is 3.2.
 - ONLY report findings that are actionable and tied to concrete files or repo behavior.
 
 ## Approach
